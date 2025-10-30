@@ -8,7 +8,7 @@ by Jeffery Myers is marked with CC0 1.0. To view a copy of this license, visit h
 */
 
 #include "raylib.h"
-
+#include <stdlib.h>
 #include "resource_dir.h"	// utility header for SearchAndSetResourceDir
 #include <omp.h>
 #include <stdio.h>
@@ -18,48 +18,176 @@ void foo(){
     int thread_count = omp_get_num_threads();
 	printf("Hello from thread %d. We have %d threads", my_rank, thread_count);
 }
+/*******************************************************************************************
+*
+*   raylib [models] example - heightmap rendering
+*
+*   Example complexity rating: [★☆☆☆] 1/4
+*
+*   Example originally created with raylib 1.8, last time updated with raylib 3.5
+*
+*   Example licensed under an unmodified zlib/libpng license, which is an OSI-certified,
+*   BSD-like license that allows static linking with closed source software
+*
+*   Copyright (c) 2015-2025 Ramon Santamaria (@raysan5)
+*
+********************************************************************************************/
 
-int main ()
+#include "raylib.h"
+static Mesh GenMeshCustom(void);    // Generate a simple triangle mesh from code
+static Image GenHeightMapImage(void);
+
+//------------------------------------------------------------------------------------
+// Program main entry point
+//------------------------------------------------------------------------------------
+int main(void)
 {
-	// Tell the window to use vsync and work on high DPI displays
-	SetConfigFlags(FLAG_VSYNC_HINT | FLAG_WINDOW_HIGHDPI);
+    // Initialization
+    //--------------------------------------------------------------------------------------
+    const int screenWidth = 800;
+    const int screenHeight = 450;
 
-	// Create the window and OpenGL context
-	InitWindow(1280, 800, "Hello Raylib");
+    InitWindow(screenWidth, screenHeight, "raylib [models] example - heightmap rendering");
 
-	// Utility function from resource_dir.h to find the resources folder and set it as the current working directory so we can load from it
-	SearchAndSetResourceDir("resources");
+    // Define our custom camera to look into our 3d world
+    Camera camera = { 0 };
+    camera.position = (Vector3){ 18.0f, 21.0f, 18.0f };     // Camera position
+    camera.target = (Vector3){ 0.0f, 0.0f, 0.0f };          // Camera looking at point
+    camera.up = (Vector3){ 0.0f, 1.0f, 0.0f };              // Camera up vector (rotation towards target)
+    camera.fovy = 45.0f;                                    // Camera field-of-view Y
+    camera.projection = CAMERA_PERSPECTIVE;                 // Camera projection type
 
-	// Load a texture from the resources directory
-	Texture wabbit = LoadTexture("wabbit_alpha.png");
+    Image image = LoadImage("resources/heightmap.png");     // Load heightmap image (RAM)
+    Texture2D texture = LoadTextureFromImage(image);        // Convert image to texture (VRAM)
 
-	#pragma omp parallel num_threads(2)
-	foo();
+    Mesh mesh = GenMeshHeightmap(image, (Vector3){ 16, 8, 16 }); // Generate heightmap mesh (RAM and VRAM)
+    Model model = LoadModelFromMesh(mesh);                  // Load model from generated mesh
+    model.materials[0].maps[MATERIAL_MAP_DIFFUSE].texture = texture; // Set map diffuse texture
+    Vector3 mapPosition = { -8.0f, 0.0f, -8.0f };           // Define model position
 	
-	// game loop
-	while (!WindowShouldClose())		// run the loop untill the user presses ESCAPE or presses the Close button on the window
-	{
-		// drawing
-		BeginDrawing();
+	Image heightMap = GenHeightMapImage();
+	Texture2D heightTexture = LoadTextureFromImage(heightMap);        // Convert image to texture (VRAM)
+	Mesh newMesh = GenMeshHeightmap(heightMap, (Vector3){ 16, 8, 16 }); // Generate heightmap mesh (RAM and VRAM)
+	Model newModel = LoadModelFromMesh(newMesh);                  // Load model from generated mesh
+	newModel.materials[0].maps[MATERIAL_MAP_DIFFUSE].texture = texture; // Set map diffuse texture
 
-		// Setup the back buffer for drawing (clear color and depth buffers)
-		ClearBackground(BLACK);
+    UnloadImage(image);             // Unload heightmap image from RAM, already uploaded to VRAM
+	// UnloadImage(heightMap);             // Unload heightmap image from RAM, already uploaded to VRAM
 
-		// draw some text using the default font
-		DrawText("Hello Raylib", 200,200,20,WHITE);
+    SetTargetFPS(60);               // Set our game to run at 60 frames-per-second
+    //--------------------------------------------------------------------------------------
 
-		// draw our texture to the screen
-		DrawTexture(wabbit, 400, 200, WHITE);
-		
-		// end the frame and get ready for the next one  (display frame, poll input, etc...)
-		EndDrawing();
-	}
+    // Main game loop
+    while (!WindowShouldClose())    // Detect window close button or ESC key
+    {
+        // Update
+        //----------------------------------------------------------------------------------
+        UpdateCamera(&camera, CAMERA_ORBITAL);
+        //----------------------------------------------------------------------------------
 
-	// cleanup
-	// unload our texture so it can be cleaned up
-	UnloadTexture(wabbit);
+        // Draw
+        //----------------------------------------------------------------------------------
+        BeginDrawing();
 
-	// destroy the window and cleanup the OpenGL context
-	CloseWindow();
-	return 0;
+            ClearBackground(RAYWHITE);
+
+            BeginMode3D(camera);
+
+			DrawModel(newModel, mapPosition, 1.0f, RED);
+                // DrawModel(model, mapPosition, 1.0f, RED);
+
+                DrawGrid(20, 1.0f);
+
+            EndMode3D();
+
+            DrawTexture(heightTexture, screenWidth - texture.width - 20, 20,  Fade(WHITE, 0.5f));
+            DrawRectangleLines(screenWidth - texture.width - 20, 20, texture.width, texture.height, GREEN);
+
+            DrawFPS(10, 10);
+
+        EndDrawing();
+        //----------------------------------------------------------------------------------
+    }
+
+    // De-Initialization
+    //--------------------------------------------------------------------------------------
+    UnloadTexture(texture);     // Unload texture
+    UnloadModel(model);         // Unload model
+
+    CloseWindow();              // Close window and OpenGL context
+    //--------------------------------------------------------------------------------------
+
+    return 0;
+}
+
+static Image GenHeightMapImage(void)
+{
+	int width = 128;
+	int height = 128;
+	// Dynamic memory allocation to store pixels data (Color type)
+    Color *pixels = (Color *)malloc(width*height*sizeof(Color));
+
+    for (int y = 0; y < height; y++)
+    {
+        for (int x = 0; x < width; x++)
+        {
+            if (((x/32+y/32)/1)%2 == 0) pixels[y*width + x] = BLACK;
+            else pixels[y*width + x] = GOLD;
+        }
+    }
+
+    // Load pixels data into an image structure and create texture
+    Image checkedIm = {
+        .data = pixels,             // We can assign pixels directly to data
+        .width = width,
+        .height = height,
+        .format = PIXELFORMAT_UNCOMPRESSED_R8G8B8A8,
+        .mipmaps = 1
+    };
+	return checkedIm;
+}
+
+static Mesh GenMeshCustom(void)
+{
+    Mesh mesh = { 0 };
+    mesh.triangleCount = 1;
+    mesh.vertexCount = mesh.triangleCount*3;
+    mesh.vertices = (float *)MemAlloc(mesh.vertexCount*3*sizeof(float));    // 3 vertices, 3 coordinates each (x, y, z)
+    mesh.texcoords = (float *)MemAlloc(mesh.vertexCount*2*sizeof(float));   // 3 vertices, 2 coordinates each (x, y)
+    mesh.normals = (float *)MemAlloc(mesh.vertexCount*3*sizeof(float));     // 3 vertices, 3 coordinates each (x, y, z)
+
+    // Vertex at (0, 0, 0)
+    mesh.vertices[0] = 0;
+    mesh.vertices[1] = 0;
+    mesh.vertices[2] = 0;
+    mesh.normals[0] = 0;
+    mesh.normals[1] = 1;
+    mesh.normals[2] = 0;
+    mesh.texcoords[0] = 0;
+    mesh.texcoords[1] = 0;
+
+    // Vertex at (1, 0, 2)
+    mesh.vertices[3] = 1;
+    mesh.vertices[4] = 0;
+    mesh.vertices[5] = 2;
+    mesh.normals[3] = 0;
+    mesh.normals[4] = 1;
+    mesh.normals[5] = 0;
+    mesh.texcoords[2] = 0.5f;
+    mesh.texcoords[3] = 1.0f;
+
+    // Vertex at (2, 0, 0)
+    mesh.vertices[6] = 2;
+    mesh.vertices[7] = 0;
+    mesh.vertices[8] = 0;
+    mesh.normals[6] = 0;
+    mesh.normals[7] = 1;
+    mesh.normals[8] = 0;
+    mesh.texcoords[4] = 1;
+    mesh.texcoords[5] =0;
+
+    // Upload mesh data from CPU (RAM) to GPU (VRAM) memory
+    UploadMesh(&mesh, false);
+
+    return mesh;
 }
