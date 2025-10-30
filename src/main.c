@@ -10,6 +10,14 @@ by Jeffery Myers is marked with CC0 1.0. To view a copy of this license, visit h
 #include "raylib.h"
 
 #include "resource_dir.h"	// utility header for SearchAndSetResourceDir
+#include <omp.h>
+#include <stdio.h>
+
+void foo(){
+	int my_rank = omp_get_thread_num();
+    int thread_count = omp_get_num_threads();
+	printf("Hello from thread %d. We have %d threads", my_rank, thread_count);
+}
 
 int main ()
 {
@@ -24,6 +32,9 @@ int main ()
 
 	// Load a texture from the resources directory
 	Texture wabbit = LoadTexture("wabbit_alpha.png");
+
+	#pragma omp parallel num_threads(2)
+	foo();
 	
 	// game loop
 	while (!WindowShouldClose())		// run the loop untill the user presses ESCAPE or presses the Close button on the window

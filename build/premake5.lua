@@ -126,6 +126,8 @@ if (os.isdir('external') == false) then
 end
 
 workspace (workspaceName)
+    openmp "On" 
+    linkoptions { "-fopenmp" }
     location "../"
     configurations { "Debug", "Release"}
     platforms { "x64", "x86", "ARM64"}
