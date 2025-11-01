@@ -69,7 +69,7 @@ int main(void)
 	Texture2D heightTexture = LoadTextureFromImage(heightMap);        // Convert image to texture (VRAM)
 	Mesh newMesh = GenMeshHeightmap(heightMap, (Vector3){ 16, 8, 16 }); // Generate heightmap mesh (RAM and VRAM)
 	Model newModel = LoadModelFromMesh(newMesh);                  // Load model from generated mesh
-	newModel.materials[0].maps[MATERIAL_MAP_DIFFUSE].texture = texture; // Set map diffuse texture
+	newModel.materials[0].maps[MATERIAL_MAP_DIFFUSE].texture = heightTexture; // Set map diffuse texture
 
     UnloadImage(image);             // Unload heightmap image from RAM, already uploaded to VRAM
 	// UnloadImage(heightMap);             // Unload heightmap image from RAM, already uploaded to VRAM
