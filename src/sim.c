@@ -1,13 +1,7 @@
+
 #include <stdlib.h>
-struct Grid;
-struct State;
-
-typedef struct Grid Grid;
-typedef struct State State;
-
-int gridIndex(int x, int y, State *state) {
-    return x + state->nx * y;
-}
+#include <string.h>
+#include <sim.h>
 
 double calculate_amplitude_at(int i, int j, State *state) {
     double above = state->currentFrame->grid[gridIndex(i, j-1, state)];
@@ -34,18 +28,6 @@ void simulate_tick(State *state) {
     state->nextFrame = state->lastFrame;
 }
 
-struct Grid{
-    double* grid;
-};
-
-struct State {
-    struct Grid* currentFrame;
-    struct Grid* lastFrame;
-    struct Grid* nextFrame;
-    int nx, ny;
-    double alpha2;
-};
-
 State initState(int nx, int ny, double c, double h, double dt) {
     double alpha = c * dt / h;
     double alpha2 = alpha * alpha;
@@ -64,3 +46,6 @@ State initState(int nx, int ny, double c, double h, double dt) {
     return foo;
 }
 
+int gridIndex(int x, int y, State *state) {
+    return x + state->nx * y;
+}

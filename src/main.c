@@ -8,10 +8,12 @@ by Jeffery Myers is marked with CC0 1.0. To view a copy of this license, visit h
 */
 
 #include "raylib.h"
+#include "raymath.h"
 #include <stdlib.h>
 #include "resource_dir.h"	// utility header for SearchAndSetResourceDir
 #include <omp.h>
 #include <stdio.h>
+#include "sim.h"
 
 void foo(){
 	int my_rank = omp_get_thread_num();
@@ -133,6 +135,36 @@ static Image GenHeightMapImage(void)
         {
             if (((x/32+y/32)/1)%2 == 0) pixels[y*width + x] = BLACK;
             else pixels[y*width + x] = GOLD;
+        }
+    }
+
+    // Load pixels data into an image structure and create texture
+    Image checkedIm = {
+        .data = pixels,             // We can assign pixels directly to data
+        .width = width,
+        .height = height,
+        .format = PIXELFORMAT_UNCOMPRESSED_R8G8B8A8,
+        .mipmaps = 1
+    };
+	return checkedIm;
+}
+
+
+static Image GenHeightMapImageState(State *state)
+{
+	int width = state->nx;
+	int height = state->ny;
+	// Dynamic memory allocation to store pixels data (Color type)
+    Color *pixels = (Color *)malloc(width*height*sizeof(Color));
+
+    for (int y = 0; y < height; y++)
+    {
+        for (int x = 0; x < width; x++)
+        {
+            double amp = state->currentFrame->grid[gridIndex(x,y,state)];
+            double v = (tanh(amp) + 1) / 2.0; 
+            Color color = { 0, (unsigned char) v*255,0,1};
+            pixels[y*width + x] = color;
         }
     }
 
