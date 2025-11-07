@@ -61,11 +61,11 @@ int main(void)
     camera.target = (Vector3){ 0.0f, 0.0f, 0.0f };          // Camera looking at point
     camera.up = (Vector3){ 0.0f, 1.0f, 0.0f };              // Camera up vector (rotation towards target)
     camera.fovy = 45.0f;                                    // Camera field-of-view Y
-    camera.projection = CAMERA_ORTHOGRAPHIC;                 // Camera projection type
+    camera.projection = CAMERA_PERSPECTIVE;                 // Camera projection type
 
-    Vector3 mapPosition = { -8.0f, 0.0f, -8.0f };           // Define model position
+    Vector3 mapPosition = { -8.0f, 10.0f, -8.0f };           // Define model position
 
-    State state = initState(nx,ny,0.2,1,0.25);
+    State state = initState(nx,ny,0.2,1,1.0);
 
     Color *pixels = (Color *)malloc(nx*ny*sizeof(Color)); 
     Image heightMap =  {
@@ -89,11 +89,24 @@ int main(void)
     SetTargetFPS(60);               // Set our game to run at 60 frames-per-second
     //--------------------------------------------------------------------------------------
 
+    int cursorDisabled = 0;
     // Main game loop
     while (!WindowShouldClose())    // Detect window close button or ESC key
     {
         if (IsKeyDown(KEY_ENTER))  {
             printf("Foo bar!");
+        }
+        if (IsKeyPressed(KEY_H))
+        {
+            if (!cursorDisabled)
+            {
+                DisableCursor();                    // Limit cursor to relative movement inside the window();
+            }
+            else
+            {
+                EnableCursor();                    // Limit cursor to relative movement inside the window();
+            }
+            cursorDisabled = !cursorDisabled;
         }
         simulate_tick(&state);
         GenHeightMapImageState(&state, &heightMap);    
@@ -107,7 +120,7 @@ int main(void)
 
         // Update
         //----------------------------------------------------------------------------------
-        UpdateCamera(&camera, CAMERA_FREE);
+        UpdateCamera(&camera, CAMERA_FIRST_PERSON);
         //----------------------------------------------------------------------------------
 
         // Draw
@@ -140,7 +153,6 @@ int main(void)
     // De-Initialization
     //--------------------------------------------------------------------------------------
     UnloadTexture(heightTexture);     // Unload texture
-    // UnloadModel(newModel);         // Unload model
 
     free(state.currentFrame);
     free(state.lastFrame);

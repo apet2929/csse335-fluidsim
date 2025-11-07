@@ -61,7 +61,7 @@ State initState(int nx, int ny, double c, double h, double dt) {
         currentFrame, lastFrame, nextFrame, nx, ny, alpha2
     };
     droplet(&foo, 5, 5, 0.5, 0.5, 3);
-    droplet(&foo, 5, 5, 0.1, 0.5, 3);
+    droplet(&foo, 5, 5, 0.1, 0.5, 10);
     
     return foo;
 }
