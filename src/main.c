@@ -15,11 +15,7 @@ by Jeffery Myers is marked with CC0 1.0. To view a copy of this license, visit h
 #include <stdio.h>
 #include "sim.h"
 
-void foo(){
-	int my_rank = omp_get_thread_num();
-    int thread_count = omp_get_num_threads();
-	printf("Hello from thread %d. We have %d threads", my_rank, thread_count);
-}
+
 /*******************************************************************************************
 *
 *   raylib [models] example - heightmap rendering
