@@ -1,7 +1,7 @@
 
 #include <stdlib.h>
 #include <string.h>
-#include <sim.h>
+#include "sim.h"
 #include <stdio.h>
 
 double calculate_amplitude_at(int i, int j, State *state) {
@@ -17,6 +17,7 @@ double calculate_amplitude_at(int i, int j, State *state) {
 }
 
 void simulate_tick(State *state) {
+    
     for (int i = 1; i < state->nx - 1; i++) {
         for (int j = 1; j < state->ny - 1; j++) {
             int curIndex = gridIndex(i, j, state);
@@ -34,10 +35,7 @@ void droplet(State* state, int width, int height, double posx, double posy, doub
     int centery = posy * state->ny;
 
     for(int row = centerx - width/2; row < state->nx && row <centerx + width/2; row++) {
-    // for(int row =64; row < 65; row++) {
-        printf("%d ", row);
         for(int col = centery - height/2; col < state->ny && col < centery + height/2; col++) {
-        // for(int col =64; col < 65; col++) {
             state->currentFrame[col + row * state->nx] = amp;
             state->lastFrame[col + row * state->nx] = amp;
         }   
@@ -68,4 +66,18 @@ State initState(int nx, int ny, double c, double h, double dt) {
 
 int gridIndex(int x, int y, State *state) {
     return x + state->nx * y;
+}
+
+int main_perf(void)
+{
+    const int nx = 128;
+    const int ny = 128;
+    State state = initState(nx,ny,0.2,1,0.25);
+
+    // while(1) {
+    //     simulate_tick(&state);
+    // }
+    printf("Hello world!\n");
+    // return 0;
+    return 0;
 }
