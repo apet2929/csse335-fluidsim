@@ -61,11 +61,11 @@ int main(void)
     camera.target = (Vector3){ 0.0f, 0.0f, 0.0f };          // Camera looking at point
     camera.up = (Vector3){ 0.0f, 1.0f, 0.0f };              // Camera up vector (rotation towards target)
     camera.fovy = 45.0f;                                    // Camera field-of-view Y
-    camera.projection = CAMERA_PERSPECTIVE;                 // Camera projection type
+    camera.projection = CAMERA_ORTHOGRAPHIC;                 // Camera projection type
 
     Vector3 mapPosition = { -8.0f, 0.0f, -8.0f };           // Define model position
 
-    State state = initState(nx,ny,0.2,1,1);
+    State state = initState(nx,ny,0.2,1,0.25);
 
     Color *pixels = (Color *)malloc(nx*ny*sizeof(Color)); 
     Image heightMap =  {
@@ -107,7 +107,7 @@ int main(void)
 
         // Update
         //----------------------------------------------------------------------------------
-        UpdateCamera(&camera, CAMERA_ORBITAL);
+        UpdateCamera(&camera, CAMERA_FREE);
         //----------------------------------------------------------------------------------
 
         // Draw
@@ -118,14 +118,14 @@ int main(void)
 
             BeginMode3D(camera);
 
-			DrawModel(newModel, mapPosition, 1.0f, WHITE);
+			DrawModel(newModel, mapPosition, 2.0f,  Fade(BLUE, 0.5f));
                 
 
                 DrawGrid(20, 1.0f);
 
             EndMode3D();
 
-            DrawTexture(heightTexture, screenWidth - heightTexture.width - 20, 20, WHITE);
+            DrawTexture(heightTexture, screenWidth - heightTexture.width - 20, 20, BLUE);
             DrawRectangleLines(screenWidth - heightTexture.width - 20, 20, heightTexture.width, heightTexture.height, GREEN);
 
             DrawFPS(10, 10);

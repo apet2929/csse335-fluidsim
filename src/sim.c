@@ -29,6 +29,21 @@ void simulate_tick(State *state) {
     state->nextFrame = state->lastFrame;
 }
 
+void droplet(State* state, int width, int height, double posx, double posy, double amp) { // posx, posy center position of drop in (0, 1) as % width, % height
+    int centerx = posx * state->nx;
+    int centery = posy * state->ny;
+
+    for(int row = centerx - width/2; row < state->nx && row <centerx + width/2; row++) {
+    // for(int row =64; row < 65; row++) {
+        printf("%d ", row);
+        for(int col = centery - height/2; col < state->ny && col < centery + height/2; col++) {
+        // for(int col =64; col < 65; col++) {
+            state->currentFrame[col + row * state->nx] = amp;
+            state->lastFrame[col + row * state->nx] = amp;
+        }   
+    }
+}
+
 State initState(int nx, int ny, double c, double h, double dt) {
     double alpha = c * dt / h;
     double alpha2 = alpha * alpha;
@@ -41,17 +56,13 @@ State initState(int nx, int ny, double c, double h, double dt) {
     memset(lastFrame, 0, nx * ny * sizeof(double));
     memset(nextFrame, 0, nx * ny * sizeof(double));
 
-    for(int row = nx * 0.4; row < nx * 0.6; row++) {
-        printf("%d ", row);
-        for(int col = ny * 0.4; col < ny * 0.6; col++) {
-            currentFrame[col + row * nx] = 3;
-            lastFrame[col + row * nx] = 3;
-        }   
-    }
-
+    
     State foo = {
         currentFrame, lastFrame, nextFrame, nx, ny, alpha2
     };
+    droplet(&foo, 5, 5, 0.5, 0.5, 3);
+    droplet(&foo, 5, 5, 0.1, 0.5, 3);
+    
     return foo;
 }
 
