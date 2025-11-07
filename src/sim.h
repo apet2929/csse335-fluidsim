@@ -1,18 +1,15 @@
 #pragma once
 
-struct Grid{
-    double* grid;
-};
+typedef double* Grid;
 
 struct State {
-    struct Grid* currentFrame;
-    struct Grid* lastFrame;
-    struct Grid* nextFrame;
+    Grid currentFrame;
+    Grid lastFrame;
+    Grid nextFrame;
     int nx, ny;
     double alpha2;
 };
 
-typedef struct Grid Grid;
 typedef struct State State;
 
 int gridIndex(int x, int y, State *state);
