@@ -18,7 +18,7 @@ double calculate_amplitude_at(int i, int j, State *state) {
 }
 
 void simulate_tick(State *state) {
-    #pragma omp parallel for collapse(2)
+    #pragma omp parallel for schedule(guided)
     for (int i = 1; i < state->nx - 1; i++) {
         for (int j = 1; j < state->ny - 1; j++) {
             int curIndex = gridIndex(i, j, state);
@@ -78,17 +78,34 @@ int main_perf(void)
     long num_steps = 1E4;
     
     int thread_counts[] = {1,2,4,6,8};
-    // for(int i = 0; i < (sizeof(thread_counts)/sizeof(int)); i++) {
-    for(int i = 0; i < 5; i++) {
+    double avg_times[5];
+    /*
+    Todo: get chunky
+    BOOM BOOM BOOM BOOM BOOM
+    Check larger grid sizes
+    Check for correctness- record total state for 10 iters, check for consistency with that +/- some fp epsillon
+    Plot (python)
+
+
+    */
+    for(int i = 4; i >= 0; i--) {
         omp_set_num_threads(thread_counts[i]);
         double starttime = omp_get_wtime();
         for(long i = 0; i < num_steps; i++) {
             simulate_tick(&state); // parallel
         }
+    
+        
         double endtime = omp_get_wtime();
         double elapsed = endtime - starttime;
         double avg = elapsed / num_steps;
         printf("For %d threads, average time per tick : %f\n", thread_counts[i], avg);
+        avg_times[i] = avg;
+    }
+
+    for(int i = 1; i < 5; i++) {
+        double speedup = avg_times[0] / avg_times[i];
+        printf("t=%d: speedup = %f\n", thread_counts[i], speedup);
     }
 
     return 0;
