@@ -7,6 +7,7 @@ struct State {
     Grid lastFrame;
     Grid nextFrame;
     int nx, ny;
+    int numBlocks;
     double alpha2;
 };
 
