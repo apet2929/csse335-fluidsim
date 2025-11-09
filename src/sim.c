@@ -7,8 +7,20 @@
 #include <time.h>
 
 #define PERF
-const int BLOCK_SIZE = 128;
+const int BLOCK_SIZE = 256;
 
+
+double update_amplitude_given_indices(State *state, int index, int above_index, int left_index, int right_index, int below_index) {
+    double above = state->currentFrame[above_index];
+    double below = state->currentFrame[below_index];
+    double left = state->currentFrame[left_index];
+    double right = state->currentFrame[right_index];
+
+    double current = state->currentFrame[index];
+    double last = state->lastFrame[index];
+
+    state->nextFrame[index] = state->alpha2 * (above + below + left + right - 4*current) + 2*current - last;
+}
 
 double update_amplitude_at_simple(State *state, int index) {
     int above_index = index - BLOCK_SIZE;
@@ -51,6 +63,115 @@ void simulate_tick(State *state) {
                 update_amplitude_at_simple(state, blockedIndex(bx,by,state->numBlocks,row,col));
             }
         }
+
+        // 1 2 3    10 11 12    ... x num_blocks
+        // 4 5 6    13 14 15    ... x num_blocks
+        // 7 8 9    ...
+        // num_blocks * BLOCK_SIZE
+        // a b c
+        // d e f
+        // g h i
+
+        int vert_offset = (BLOCK_SIZE*BLOCK_SIZE*state->numBlocks) - ((BLOCK_SIZE-1) * BLOCK_SIZE); // 
+        int hor_offset = (BLOCK_SIZE*BLOCK_SIZE) - (BLOCK_SIZE-1);
+        // for(int row = 0; row < BLOCK_SIZE; row += BLOCK_SIZE-1)
+
+        {
+        if(by != 0){ // first row
+            int row = 1;
+            for(int col = 1; col < BLOCK_SIZE-1; col++) {
+                int index = blockedIndex(bx, by, state->numBlocks, row, col);
+                int above_index = index - vert_offset;
+                int left_index = index - 1;
+                int right_index = index + 1;
+                int below_index = index + BLOCK_SIZE;
+                update_amplitude_given_indices(state, index, above_index, left_index, right_index, below_index);
+            }
+        }
+
+        if(by != state->numBlocks-1){ // last row
+            int row = state->ny;
+            for(int col = 1; col < BLOCK_SIZE-1; col++) {
+                int index = blockedIndex(bx, by, state->numBlocks, row, col);
+                int above_index = index - BLOCK_SIZE;
+                int left_index = index - 1;
+                int right_index = index + 1;
+                int below_index = index + vert_offset;
+                update_amplitude_given_indices(state, index, above_index, left_index, right_index, below_index);
+            }
+        }
+
+        if(bx != 0){ // first col of block
+            int col = 0;
+            for(int row = 1; row < BLOCK_SIZE-1; row++) {
+                int index = blockedIndex(bx, by, state->numBlocks, row, col);
+                int above_index = index - BLOCK_SIZE;
+                int left_index = index - hor_offset;
+                int right_index = index + 1;
+                int below_index = index + BLOCK_SIZE;
+                update_amplitude_given_indices(state, index, above_index, left_index, right_index, below_index);
+            }
+        }
+
+        if(bx != state->numBlocks-1){ // last col of block
+            int col = BLOCK_SIZE-1;
+            for(int row = 1; row < BLOCK_SIZE-1; row++) {
+                int index = blockedIndex(bx, by, state->numBlocks, row, col);
+                int above_index = index - BLOCK_SIZE;
+                int left_index = index - 1;
+                int right_index = index + hor_offset;
+                int below_index = index + BLOCK_SIZE;
+                update_amplitude_given_indices(state, index, above_index, left_index, right_index, below_index);
+            }
+        }
+        }
+        
+        { // corners
+            if(bx != 0 && by != 0) { // top left
+                int col = 0;
+                int row = 0;
+                int index = blockedIndex(bx, by, state->numBlocks, row, col);
+                int above_index = index - vert_offset;
+                int left_index = index - hor_offset;
+                int right_index = index + 1;
+                int below_index = index + BLOCK_SIZE;
+                update_amplitude_given_indices(state, index, above_index, left_index, right_index, below_index);
+            }
+
+            if(by != 0 && bx != state->numBlocks-1) { // top right
+                int col = BLOCK_SIZE-1;
+                int row = 0;
+                int index = blockedIndex(bx, by, state->numBlocks, row, col);
+                int above_index = index - vert_offset;
+                int left_index = index - 1;
+                int right_index = index + hor_offset;
+                int below_index = index + BLOCK_SIZE;
+                update_amplitude_given_indices(state, index, above_index, left_index, right_index, below_index);
+            }
+
+            if(bx != 0 && by != state->numBlocks-1) { // bottom left
+                int col = BLOCK_SIZE-1;
+                int row = 0;
+                int index = blockedIndex(bx, by, state->numBlocks, row, col);
+                int above_index = index - BLOCK_SIZE;
+                int left_index = index - hor_offset;
+                int right_index = index + 1;
+                int below_index = index + vert_offset;
+                update_amplitude_given_indices(state, index, above_index, left_index, right_index, below_index);
+            }
+
+            if(bx != state->numBlocks-1 && by != state->numBlocks-1) { // bottom right
+                int col = BLOCK_SIZE-1;
+                int row = 0;
+                int index = blockedIndex(bx, by, state->numBlocks, row, col);
+                int above_index = index - BLOCK_SIZE;
+                int left_index = index - 1;
+                int right_index = index + hor_offset;
+                int below_index = index + vert_offset;
+                update_amplitude_given_indices(state, index, above_index, left_index, right_index, below_index);
+            }
+        }
+
 
         // if(by != 0) { // skip over top row
             // for(int col = 1; ...)
@@ -119,7 +240,7 @@ int gridIndex(int x, int y, State* state) {
 }
 
 
-int main(void)
+int main_perf(void)
 {
     
     const int nx = 1024;
