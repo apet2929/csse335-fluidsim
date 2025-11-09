@@ -7,14 +7,14 @@
 #include <time.h>
 
 #define PERF
-const int BLOCK_SIZE = 128;
+const int BLOCK_SIZE = 286;
 
 
-double update_amplitude_at_simple(State *state, int index) {
-    int above_index = index - BLOCK_SIZE;
+double update_amplitude_at_simple(State *state, int block_M, int index) {
+    int above_index = index - block_M;
     int left_index = index - 1;
     int right_index = index + 1;
-    int below_index = index + BLOCK_SIZE;
+    int below_index = index + block_M;
 
     double above = state->currentFrame[above_index];
     double below = state->currentFrame[below_index];
@@ -41,20 +41,22 @@ double update_amplitude_at_simple(State *state, int index) {
 
 void simulate_tick(State *state) {
     int chunk = BLOCK_SIZE * BLOCK_SIZE;
-    #pragma omp parallel for
-    for(int block_index = 0; block_index < state->numBlocks * state->numBlocks; block_index++) {
-        int bx = block_index % state->numBlocks;
-        int by = block_index / state->numBlocks;
-        
-        for(int row = 1; row < BLOCK_SIZE - 1; row++) {
-            for(int col = 1; col < BLOCK_SIZE - 1; col++) {
-                update_amplitude_at_simple(state, blockedIndex(bx,by,state->numBlocks,row,col));
+    #pragma omp parallel for collapse(2)
+     for (int bx = 0; bx < state->numBlocks; ++bx) {
+        for (int by = 0; by < state->numBlocks; ++by) {
+            int block_N = (bx+1) * BLOCK_SIZE > state->nx ? state->nx - bx * BLOCK_SIZE : BLOCK_SIZE;
+            int block_M = (by+1) * BLOCK_SIZE > state->ny ? state->ny - by * BLOCK_SIZE : BLOCK_SIZE;
+            
+            for(int row = 1; row < block_M - 1; row++) {
+                for(int col = 1; col < block_N - 1; col++) {
+                    update_amplitude_at_simple(state, block_M, blockedIndex(bx,by,state->numBlocks,block_M, row, col));
+                }
             }
-        }
 
-        // if(by != 0) { // skip over top row
-            // for(int col = 1; ...)
-        // }
+            // if(by != 0) { // skip over top row
+                // for(int col = 1; ...)
+            // }
+        }
     }
     // for (int i = 1; i < state->nx - 1; i++) {
     //     for (int j = 1; j < state->ny - 1; j++) {
@@ -104,24 +106,25 @@ State initState(int nx, int ny, double c, double h, double dt) {
 }
 
 
-int blockedIndex(int bx, int by, int num_blocks, int row, int col) {
+int blockedIndex(int bx, int by, int num_blocks, int block_M, int row, int col) {
     return (BLOCK_SIZE * BLOCK_SIZE) * (by*num_blocks + bx) + // origin position of block
-            (col + row * BLOCK_SIZE);                          // position within block
+            (col + row * block_M);                          // position within block
 }
 
-// x,y -> bi,bj,row,col
+// x,y -> bi,by,row,col
 int gridIndex(int x, int y, State* state) {
     int bx = x / BLOCK_SIZE;
     int col = x % BLOCK_SIZE;
     int by = y / BLOCK_SIZE;
     int row = y % BLOCK_SIZE;
-    return blockedIndex(bx, by, state->numBlocks, row, col);
+    int block_M = (bx+1) * BLOCK_SIZE > state->nx ? state->nx - bx * BLOCK_SIZE : BLOCK_SIZE;
+            
+    return blockedIndex(bx, by, state->numBlocks, block_M, row, col);
 }
 
 
-int main(void)
+int main_perf(void)
 {
-    
     const int nx = 1024;
     const int ny = 1024;
     State state = initState(nx,ny,0.2,1,0.25);
