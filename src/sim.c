@@ -6,28 +6,62 @@
 #include <omp.h>
 #include <time.h>
 
-const int BLOCK_SIZE = 64;
+#define PERF
+const int BLOCK_SIZE = 128;
 
-double calculate_amplitude_at(int i, int j, State *state) {
-    double above = state->currentFrame[gridIndex(i, j-1, state)];
-    double below = state->currentFrame[gridIndex(i, j+1, state)];
-    double left = state->currentFrame[gridIndex(i-1, j, state)];
-    double right = state->currentFrame[gridIndex(i+1, j, state)];
 
-    double current = state->currentFrame[gridIndex(i,j,state)];
-    double last = state->lastFrame[gridIndex(i,j,state)];
+double update_amplitude_at_simple(State *state, int index) {
+    int above_index = index - BLOCK_SIZE;
+    int left_index = index - 1;
+    int right_index = index + 1;
+    int below_index = index + BLOCK_SIZE;
 
-    return state->alpha2 * (above + below + left + right - 4*current) + 2*current - last;
+    double above = state->currentFrame[above_index];
+    double below = state->currentFrame[below_index];
+    double left = state->currentFrame[left_index];
+    double right = state->currentFrame[right_index];
+
+    double current = state->currentFrame[index];
+    double last = state->lastFrame[index];
+
+    state->nextFrame[index] = state->alpha2 * (above + below + left + right - 4*current) + 2*current - last;
 }
+// double calculate_amplitude_at(State *state, int bx, int by, int col, int row) { // TODO: Optimize this, reduce calls to gridIndex where possible
+    
+//     double above = state->currentFrame[gridIndex(i, j-1, state)];
+//     double below = state->currentFrame[gridIndex(i, j+1, state)];
+//     double left = state->currentFrame[gridIndex(i-1, j, state)];
+//     double right = state->currentFrame[gridIndex(i+1, j, state)];
+
+//     double current = state->currentFrame[gridIndex(i,j,state)];
+//     double last = state->lastFrame[gridIndex(i,j,state)];
+
+//     return state->alpha2 * (above + below + left + right - 4*current) + 2*current - last;
+// }
 
 void simulate_tick(State *state) {
-    #pragma omp parallel for schedule(guided)
-    for (int i = 1; i < state->nx - 1; i++) {
-        for (int j = 1; j < state->ny - 1; j++) {
-            int curIndex = gridIndex(i, j, state);
-            state->nextFrame[curIndex] = calculate_amplitude_at(i, j, state);
+    int chunk = BLOCK_SIZE * BLOCK_SIZE;
+    #pragma omp parallel for
+    for(int block_index = 0; block_index < state->numBlocks * state->numBlocks; block_index++) {
+        int bx = block_index % state->numBlocks;
+        int by = block_index / state->numBlocks;
+        
+        for(int row = 1; row < BLOCK_SIZE - 1; row++) {
+            for(int col = 1; col < BLOCK_SIZE - 1; col++) {
+                update_amplitude_at_simple(state, blockedIndex(bx,by,state->numBlocks,row,col));
+            }
         }
+
+        // if(by != 0) { // skip over top row
+            // for(int col = 1; ...)
+        // }
     }
+    // for (int i = 1; i < state->nx - 1; i++) {
+    //     for (int j = 1; j < state->ny - 1; j++) {
+    //         int curIndex = gridIndex(i, j, state);
+    //         state->nextFrame[curIndex] = calculate_amplitude_at(i, j, state);
+    //     }
+    // }
 
     state->lastFrame = state->currentFrame;
     state->currentFrame = state->nextFrame;
@@ -63,8 +97,8 @@ State initState(int nx, int ny, double c, double h, double dt) {
     State foo = {
         currentFrame, lastFrame, nextFrame, nx, ny, num_blocks, alpha2
     };
-    droplet(&foo, 5, 5, 0.5, 0.5, 3);
-    droplet(&foo, 5, 5, 0.1, 0.5, 10);
+    // droplet(&foo, 5, 5, 0.5, 0.5, 3);
+    droplet(&foo, 5, 5, 0.1, 0.1, 10);
     
     return foo;
 }
@@ -87,11 +121,12 @@ int gridIndex(int x, int y, State* state) {
 
 int main(void)
 {
-    const int nx = 128;
-    const int ny = 128;
+    
+    const int nx = 1024;
+    const int ny = 1024;
     State state = initState(nx,ny,0.2,1,0.25);
 
-    long num_steps = 5E3;
+    long num_steps = 200;
     
     int thread_counts[] = {1,2,4,6,8};
     double avg_times[5];
