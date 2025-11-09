@@ -7,7 +7,7 @@
 #include <time.h>
 
 #define PERF
-const int BLOCK_SIZE = 256;
+const int BLOCK_SIZE = 16;
 
 
 double update_amplitude_given_indices(State *state, int index, int above_index, int left_index, int right_index, int below_index) {
@@ -53,6 +53,7 @@ double update_amplitude_at_simple(State *state, int index) {
 
 void simulate_tick(State *state) {
     int chunk = BLOCK_SIZE * BLOCK_SIZE;
+    
     #pragma omp parallel for
     for(int block_index = 0; block_index < state->numBlocks * state->numBlocks; block_index++) {
         int bx = block_index % state->numBlocks;
@@ -72,16 +73,27 @@ void simulate_tick(State *state) {
         // d e f
         // g h i
 
-        int vert_offset = (BLOCK_SIZE*BLOCK_SIZE*state->numBlocks) - ((BLOCK_SIZE-1) * BLOCK_SIZE); // 
+        // | bar .   |
+        // | foo baz |
+
+        int foo = blockedIndex(0, 1, state->numBlocks, 0, BLOCK_SIZE-1); // top right of block [0,1]
+        int bar = blockedIndex(0, 0, state->numBlocks, BLOCK_SIZE-1, 0); // above foo
+        int baz = blockedIndex(1, 1, state->numBlocks, 0, 0);            // right of foo
+
+        int vert_offset = (BLOCK_SIZE*BLOCK_SIZE*state->numBlocks) - ((BLOCK_SIZE-2) * BLOCK_SIZE) - 1; // 
         int hor_offset = (BLOCK_SIZE*BLOCK_SIZE) - (BLOCK_SIZE-1);
         // for(int row = 0; row < BLOCK_SIZE; row += BLOCK_SIZE-1)
+        
+        // left_index = (index) -> index - 1;
+        // if(on_left_edge): left_index = (index) -> (blockedIndex(bx-1,by, state->numBlocks,row,col);)
 
+        // printf("Hi\n");
         {
         if(by != 0){ // first row
             int row = 1;
             for(int col = 1; col < BLOCK_SIZE-1; col++) {
                 int index = blockedIndex(bx, by, state->numBlocks, row, col);
-                int above_index = index - vert_offset;
+                int above_index = blockedIndex(bx,by-1,state->numBlocks,row,col);
                 int left_index = index - 1;
                 int right_index = index + 1;
                 int below_index = index + BLOCK_SIZE;
@@ -96,7 +108,7 @@ void simulate_tick(State *state) {
                 int above_index = index - BLOCK_SIZE;
                 int left_index = index - 1;
                 int right_index = index + 1;
-                int below_index = index + vert_offset;
+                int below_index = blockedIndex(bx,by+1,state->numBlocks,row,col);
                 update_amplitude_given_indices(state, index, above_index, left_index, right_index, below_index);
             }
         }
@@ -106,7 +118,7 @@ void simulate_tick(State *state) {
             for(int row = 1; row < BLOCK_SIZE-1; row++) {
                 int index = blockedIndex(bx, by, state->numBlocks, row, col);
                 int above_index = index - BLOCK_SIZE;
-                int left_index = index - hor_offset;
+                int left_index = blockedIndex(bx-1,by, state->numBlocks,row,col);
                 int right_index = index + 1;
                 int below_index = index + BLOCK_SIZE;
                 update_amplitude_given_indices(state, index, above_index, left_index, right_index, below_index);
@@ -119,7 +131,7 @@ void simulate_tick(State *state) {
                 int index = blockedIndex(bx, by, state->numBlocks, row, col);
                 int above_index = index - BLOCK_SIZE;
                 int left_index = index - 1;
-                int right_index = index + hor_offset;
+                int right_index = blockedIndex(bx+1,by, state->numBlocks,row,col);
                 int below_index = index + BLOCK_SIZE;
                 update_amplitude_given_indices(state, index, above_index, left_index, right_index, below_index);
             }
@@ -131,8 +143,8 @@ void simulate_tick(State *state) {
                 int col = 0;
                 int row = 0;
                 int index = blockedIndex(bx, by, state->numBlocks, row, col);
-                int above_index = index - vert_offset;
-                int left_index = index - hor_offset;
+                int above_index = blockedIndex(bx,by-1,state->numBlocks,row,col);;
+                int left_index = blockedIndex(bx-1,by,state->numBlocks,row,col);;
                 int right_index = index + 1;
                 int below_index = index + BLOCK_SIZE;
                 update_amplitude_given_indices(state, index, above_index, left_index, right_index, below_index);
@@ -142,32 +154,32 @@ void simulate_tick(State *state) {
                 int col = BLOCK_SIZE-1;
                 int row = 0;
                 int index = blockedIndex(bx, by, state->numBlocks, row, col);
-                int above_index = index - vert_offset;
+                int above_index = blockedIndex(bx,by-1,state->numBlocks,row,col);
                 int left_index = index - 1;
-                int right_index = index + hor_offset;
+                int right_index =  blockedIndex(bx+1,by,state->numBlocks,row,col);
                 int below_index = index + BLOCK_SIZE;
                 update_amplitude_given_indices(state, index, above_index, left_index, right_index, below_index);
             }
 
             if(bx != 0 && by != state->numBlocks-1) { // bottom left
-                int col = BLOCK_SIZE-1;
-                int row = 0;
+                int col = 0;
+                int row = BLOCK_SIZE-1;
                 int index = blockedIndex(bx, by, state->numBlocks, row, col);
                 int above_index = index - BLOCK_SIZE;
-                int left_index = index - hor_offset;
+                int left_index =  blockedIndex(bx-1,by,state->numBlocks,row,col);;
                 int right_index = index + 1;
-                int below_index = index + vert_offset;
+                int below_index =  blockedIndex(bx,by+1,state->numBlocks,row,col);;
                 update_amplitude_given_indices(state, index, above_index, left_index, right_index, below_index);
             }
 
             if(bx != state->numBlocks-1 && by != state->numBlocks-1) { // bottom right
                 int col = BLOCK_SIZE-1;
-                int row = 0;
+                int row = BLOCK_SIZE-1;
                 int index = blockedIndex(bx, by, state->numBlocks, row, col);
                 int above_index = index - BLOCK_SIZE;
                 int left_index = index - 1;
-                int right_index = index + hor_offset;
-                int below_index = index + vert_offset;
+                int right_index =  blockedIndex(bx+1,by,state->numBlocks,row,col);;
+                int below_index = blockedIndex(bx,by+1,state->numBlocks,row,col);;
                 update_amplitude_given_indices(state, index, above_index, left_index, right_index, below_index);
             }
         }

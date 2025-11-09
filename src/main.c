@@ -44,8 +44,8 @@ int main(void)
 {
     // Initialization
     //--------------------------------------------------------------------------------------
-    const int nx = 1024;
-    const int ny = 1024;
+    const int nx = 128;
+    const int ny = 128;
 
     int screenWidth = 800;
     int screenHeight = 450;
