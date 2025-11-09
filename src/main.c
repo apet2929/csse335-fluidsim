@@ -14,6 +14,7 @@ by Jeffery Myers is marked with CC0 1.0. To view a copy of this license, visit h
 #include <omp.h>
 #include <stdio.h>
 #include "sim.h"
+#include <math.h>
 
 
 /*******************************************************************************************
@@ -43,11 +44,15 @@ int main(void)
 {
     // Initialization
     //--------------------------------------------------------------------------------------
-    const int screenWidth = 800;
-    const int screenHeight = 450;
+    const int nx = 1024;
+    const int ny = 1024;
 
-    const int nx = 128;
-    const int ny = 128;
+    int screenWidth = 800;
+    int screenHeight = 450;
+    screenWidth = screenWidth > nx ? screenWidth : nx;
+    screenHeight = screenHeight > ny ? screenHeight : ny;
+
+    const int drawMesh = 0;
 
     InitWindow(screenWidth, screenHeight, "raylib [models] example - heightmap rendering");
 
@@ -75,9 +80,14 @@ int main(void)
     // Image* heightMap = GenHeightMapImage();
     ExportImage(heightMap, "SimHeightMap.png");
 	Texture2D heightTexture = LoadTextureFromImage(heightMap);        // Convert image to texture (VRAM)
-	Mesh newMesh = GenMeshHeightmap(heightMap, (Vector3){ 16, 8, 16 }); // Generate heightmap mesh (RAM and VRAM)
-	Model newModel = LoadModelFromMesh(newMesh);                  // Load model from generated mesh
-	newModel.materials[0].maps[MATERIAL_MAP_DIFFUSE].texture = heightTexture; // Set map diffuse texture
+    Mesh newMesh;
+    Model newModel;
+    if (drawMesh) {
+        Mesh newMesh = GenMeshHeightmap(heightMap, (Vector3){ 16, 8, 16 }); // Generate heightmap mesh (RAM and VRAM)
+        Model newModel = LoadModelFromMesh(newMesh);                  // Load model from generated mesh
+        newModel.materials[0].maps[MATERIAL_MAP_DIFFUSE].texture = heightTexture; // Set map diffuse texture
+    }
+
 
     // UnloadImage(image);             // Unload heightmap image from RAM, already uploaded to VRAM
 	// UnloadImage(heightMap);             // Unload heightmap image from RAM, already uploaded to VRAM
@@ -87,6 +97,10 @@ int main(void)
 
     int cursorDisabled = 0;
     // Main game loop
+    omp_set_num_threads(8);
+
+    int total_fps = 0;
+    int frames = 1;
     while (!WindowShouldClose())    // Detect window close button or ESC key
     {
         if (IsKeyDown(KEY_ENTER))  {
@@ -107,12 +121,12 @@ int main(void)
         simulate_tick(&state);
         GenHeightMapImageState(&state, &heightMap);    
         UpdateTexture(heightTexture, heightMap.data);
-        // heightTexture = LoadTextureFromImage(heightMap);        // Convert image to texture (VRAM)
-        newMesh = GenMeshHeightmap(heightMap, (Vector3){ 16, 8, 16 }); // Generate heightmap mesh (RAM and VRAM)
-        // UpdateMeshBuffer() 
-        newModel = LoadModelFromMesh(newMesh);                  // Load model from generated mesh
-    	newModel.materials[0].maps[MATERIAL_MAP_DIFFUSE].texture = heightTexture; // Set map diffuse texture
 
+        if (drawMesh) {
+            newMesh = GenMeshHeightmap(heightMap, (Vector3){ 16, 8, 16 }); // Generate heightmap mesh (RAM and VRAM)
+            newModel = LoadModelFromMesh(newMesh);                  // Load model from generated mesh
+            newModel.materials[0].maps[MATERIAL_MAP_DIFFUSE].texture = heightTexture; // Set map diffuse texture
+        }
 
         // Update
         //----------------------------------------------------------------------------------
@@ -125,24 +139,34 @@ int main(void)
 
             ClearBackground(RAYWHITE);
 
-            BeginMode3D(camera);
 
-			DrawModel(newModel, mapPosition, 2.0f,  Fade(BLUE, 0.5f));
-                
+            if (drawMesh) {
+                BeginMode3D(camera);
 
+                DrawModel(newModel, mapPosition, 0.25f,  Fade(BLUE, 0.5f));
                 DrawGrid(20, 1.0f);
 
-            EndMode3D();
+                EndMode3D();
+            }
 
             DrawTexture(heightTexture, screenWidth - heightTexture.width - 20, 20, BLUE);
             DrawRectangleLines(screenWidth - heightTexture.width - 20, 20, heightTexture.width, heightTexture.height, GREEN);
 
             DrawFPS(10, 10);
 
+            Color color = LIME;
+            total_fps += GetFPS();
+            int average_fps = total_fps / frames;
+            if ((average_fps < 30) && (average_fps >= 15)) color = ORANGE;
+            else if (average_fps < 15) color = RED;
+            DrawText(TextFormat("%2i Average FPS", average_fps), 10, 30, 20, color);
+            frames++;
+
         EndDrawing();
 
-        UnloadModel(newModel);
-        // UnloadMesh(newMesh);
+        if (drawMesh) {
+            UnloadModel(newModel);
+        }
         //----------------------------------------------------------------------------------
     }
 
