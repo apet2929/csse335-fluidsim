@@ -5,12 +5,45 @@
 #include <stdio.h>
 #include <omp.h>
 #include <time.h>
-
 #define PERF
-const int BLOCK_SIZE = 16;
-
+const int BLOCK_SIZE = 128;
 
 double update_amplitude_given_indices(State *state, int index, int above_index, int left_index, int right_index, int below_index) {
+    double above = state->currentFrame[above_index];
+    double below = state->currentFrame[below_index];
+    double left = state->currentFrame[left_index];
+    double right = state->currentFrame[right_index];
+
+    double current = state->currentFrame[index];
+    double last = state->lastFrame[index];
+
+    state->nextFrame[index] = state->alpha2 * (above + below + left + right - 4*current) + 2*current - last;
+}
+
+
+double update_amplitude_at_complex(State *state, int bx, int by, int col, int row) {
+    // edges of the grid
+    if((bx == 0 && col == 0) || (bx == state->numBlocks-1 && col == BLOCK_SIZE-1)) return 0.0;
+    if((by == 0 && row == 0) || (by == state->numBlocks-1 && row == BLOCK_SIZE-1)) return 0.0;
+    
+    int index = blockedIndex(bx, by, state->numBlocks, row, col);
+
+    int above_index;
+    if(row == 0) above_index = blockedIndex(bx, by-1, state->numBlocks, BLOCK_SIZE-1, col);
+    else above_index = index - BLOCK_SIZE;
+    
+    int left_index;
+    if(col == 0) left_index = blockedIndex(bx-1, by, state->numBlocks, row, BLOCK_SIZE-1);
+    else left_index = index - 1;
+    
+    int right_index;
+    if(col == BLOCK_SIZE-1) right_index = blockedIndex(bx+1, by, state->numBlocks, row, 0);
+    else right_index = index + 1;
+    
+    int below_index;
+    if(row == BLOCK_SIZE-1) below_index = blockedIndex(bx, by+1, state->numBlocks, 0, col);
+    else below_index = index + BLOCK_SIZE;
+
     double above = state->currentFrame[above_index];
     double below = state->currentFrame[below_index];
     double left = state->currentFrame[left_index];
@@ -51,17 +84,28 @@ double update_amplitude_at_simple(State *state, int index) {
 //     return state->alpha2 * (above + below + left + right - 4*current) + 2*current - last;
 // }
 
-void simulate_tick(State *state) {
+void simulate_tick(State *state) {    
+    const int default_horizontal_offset = 1; // horizontal
+    const int default_vertical_offset = BLOCK_SIZE; // horizontal
+    const int block_edge_h_offset = (BLOCK_SIZE*BLOCK_SIZE) - (BLOCK_SIZE-1);
+    const int block_edge_v_offset = (BLOCK_SIZE*BLOCK_SIZE*state->numBlocks) - ((BLOCK_SIZE-2) * BLOCK_SIZE) - 1;
+
     int chunk = BLOCK_SIZE * BLOCK_SIZE;
-    
+
     #pragma omp parallel for
     for(int block_index = 0; block_index < state->numBlocks * state->numBlocks; block_index++) {
         int bx = block_index % state->numBlocks;
         int by = block_index / state->numBlocks;
         
-        for(int row = 1; row < BLOCK_SIZE - 1; row++) {
-            for(int col = 1; col < BLOCK_SIZE - 1; col++) {
-                update_amplitude_at_simple(state, blockedIndex(bx,by,state->numBlocks,row,col));
+        // for(int row = 1; row < BLOCK_SIZE - 1; row++) {
+        //     for(int col = 1; col < BLOCK_SIZE - 1; col++) {
+        //         update_amplitude_at_simple(state, blockedIndex(bx,by,state->numBlocks,row,col));
+        //     }
+        // }
+
+        for(int row = 0; row < BLOCK_SIZE; row++) {
+            for(int col = 0; col < BLOCK_SIZE; col++) {
+                update_amplitude_at_complex(state, bx, by, col, row);
             }
         }
 
@@ -76,113 +120,84 @@ void simulate_tick(State *state) {
         // | bar .   |
         // | foo baz |
 
-        int foo = blockedIndex(0, 1, state->numBlocks, 0, BLOCK_SIZE-1); // top right of block [0,1]
-        int bar = blockedIndex(0, 0, state->numBlocks, BLOCK_SIZE-1, 0); // above foo
-        int baz = blockedIndex(1, 1, state->numBlocks, 0, 0);            // right of foo
+        // int foo = blockedIndex(0, 1, state->numBlocks, 0, BLOCK_SIZE-1); // top right of block [0,1]
+        // int bar = blockedIndex(0, 0, state->numBlocks, BLOCK_SIZE-1, 0); // above foo
+        // int baz = blockedIndex(1, 1, state->numBlocks, 0, 0);            // right of foo
 
-        int vert_offset = (BLOCK_SIZE*BLOCK_SIZE*state->numBlocks) - ((BLOCK_SIZE-2) * BLOCK_SIZE) - 1; // 
-        int hor_offset = (BLOCK_SIZE*BLOCK_SIZE) - (BLOCK_SIZE-1);
-        // for(int row = 0; row < BLOCK_SIZE; row += BLOCK_SIZE-1)
+        // int vert_offset = (BLOCK_SIZE*BLOCK_SIZE*state->numBlocks) - ((BLOCK_SIZE-2) * BLOCK_SIZE) - 1;
+        // int hor_offset = (BLOCK_SIZE*BLOCK_SIZE) - (BLOCK_SIZE-1);
         
-        // left_index = (index) -> index - 1;
-        // if(on_left_edge): left_index = (index) -> (blockedIndex(bx-1,by, state->numBlocks,row,col);)
+        // {
+        // if(by != 0){ // first row
+        //     int row = 1;
+        //     for(int col = 1 + (bx == 0); col < BLOCK_SIZE-(1 + (bx == state->numBlocks)); col++) {
+        //         update_amplitude_at_complex(state, bx, by, col, row);
+        //         // int index = blockedIndex(bx, by, state->numBlocks, row, col);
+        //         // update_amplitude_given_indices(state, index, index-block_edge_v_offset, index-default_horizontal_offset, index+default_horizontal_offset, index+default_vertical_offset);
+        //     }
+        // }
 
-        // printf("Hi\n");
-        {
-        if(by != 0){ // first row
-            int row = 1;
-            for(int col = 1; col < BLOCK_SIZE-1; col++) {
-                int index = blockedIndex(bx, by, state->numBlocks, row, col);
-                int above_index = blockedIndex(bx,by-1,state->numBlocks,row,col);
-                int left_index = index - 1;
-                int right_index = index + 1;
-                int below_index = index + BLOCK_SIZE;
-                update_amplitude_given_indices(state, index, above_index, left_index, right_index, below_index);
-            }
-        }
+        // if(by != state->numBlocks-1){ // last row
+        //     int row = state->ny;
+        //     for(int col = 1 + (bx == 0); col < BLOCK_SIZE-(1 + (bx == state->numBlocks)); col++) {
+        //         update_amplitude_at_complex(state, bx, by, col, row);
+        //         // int index = blockedIndex(bx, by, state->numBlocks, row, col);
+        //         // update_amplitude_given_indices(state, index, index-default_vertical_offset, index-default_horizontal_offset, index+default_horizontal_offset, index+block_edge_v_offset);
+        //     }
+        // }
 
-        if(by != state->numBlocks-1){ // last row
-            int row = state->ny;
-            for(int col = 1; col < BLOCK_SIZE-1; col++) {
-                int index = blockedIndex(bx, by, state->numBlocks, row, col);
-                int above_index = index - BLOCK_SIZE;
-                int left_index = index - 1;
-                int right_index = index + 1;
-                int below_index = blockedIndex(bx,by+1,state->numBlocks,row,col);
-                update_amplitude_given_indices(state, index, above_index, left_index, right_index, below_index);
-            }
-        }
+        //     if(bx != 0){ // first col of block
+        //         int col = 0;
+        //         for(int row = 1 + (by == 0); row < BLOCK_SIZE-(1 + (by == state->numBlocks)); row++) {
+        //             update_amplitude_at_complex(state, bx, by, col, row);
+        //             // int index = blockedIndex(bx, by, state->numBlocks, row, col);
+        //             // update_amplitude_given_indices(state, index, index-default_vertical_offset, index-block_edge_h_offset, index+default_horizontal_offset, index+default_vertical_offset);
+        //         }
+        //     }
 
-        if(bx != 0){ // first col of block
-            int col = 0;
-            for(int row = 1; row < BLOCK_SIZE-1; row++) {
-                int index = blockedIndex(bx, by, state->numBlocks, row, col);
-                int above_index = index - BLOCK_SIZE;
-                int left_index = blockedIndex(bx-1,by, state->numBlocks,row,col);
-                int right_index = index + 1;
-                int below_index = index + BLOCK_SIZE;
-                update_amplitude_given_indices(state, index, above_index, left_index, right_index, below_index);
-            }
-        }
-
-        if(bx != state->numBlocks-1){ // last col of block
-            int col = BLOCK_SIZE-1;
-            for(int row = 1; row < BLOCK_SIZE-1; row++) {
-                int index = blockedIndex(bx, by, state->numBlocks, row, col);
-                int above_index = index - BLOCK_SIZE;
-                int left_index = index - 1;
-                int right_index = blockedIndex(bx+1,by, state->numBlocks,row,col);
-                int below_index = index + BLOCK_SIZE;
-                update_amplitude_given_indices(state, index, above_index, left_index, right_index, below_index);
-            }
-        }
-        }
+        //     if(bx != state->numBlocks-1){ // last col of block
+        //         int col = BLOCK_SIZE-1;
+        //         for(int row = 1 + (by == 0); row < BLOCK_SIZE-(1 + (by == state->numBlocks)); row++) {
+        //             update_amplitude_at_complex(state, bx, by, col, row);
+        //             // int index = blockedIndex(bx, by, state->numBlocks, row, col);
+        //             // update_amplitude_given_indices(state, index, index-default_vertical_offset, index-default_horizontal_offset, index+block_edge_h_offset, index+default_vertical_offset);
+        //         }
+        //     }
+        // }
         
-        { // corners
-            if(bx != 0 && by != 0) { // top left
-                int col = 0;
-                int row = 0;
-                int index = blockedIndex(bx, by, state->numBlocks, row, col);
-                int above_index = blockedIndex(bx,by-1,state->numBlocks,row,col);;
-                int left_index = blockedIndex(bx-1,by,state->numBlocks,row,col);;
-                int right_index = index + 1;
-                int below_index = index + BLOCK_SIZE;
-                update_amplitude_given_indices(state, index, above_index, left_index, right_index, below_index);
-            }
+        // { // corners
+        //     if(bx != 0 && by != 0) { // top left
+        //         int col = 0;
+        //         int row = 0;
+        //         update_amplitude_at_complex(state, bx, by, col, row);
+        //         // int index = blockedIndex(bx, by, state->numBlocks, row, col);
+        //         // update_amplitude_given_indices(state, index, index-block_edge_v_offset, index-block_edge_h_offset, index+default_horizontal_offset, index+default_vertical_offset);
+        //     }
 
-            if(by != 0 && bx != state->numBlocks-1) { // top right
-                int col = BLOCK_SIZE-1;
-                int row = 0;
-                int index = blockedIndex(bx, by, state->numBlocks, row, col);
-                int above_index = blockedIndex(bx,by-1,state->numBlocks,row,col);
-                int left_index = index - 1;
-                int right_index =  blockedIndex(bx+1,by,state->numBlocks,row,col);
-                int below_index = index + BLOCK_SIZE;
-                update_amplitude_given_indices(state, index, above_index, left_index, right_index, below_index);
-            }
+        //     if(by != 0 && bx != state->numBlocks-1) { // top right
+        //         int col = BLOCK_SIZE-1;
+        //         int row = 0;
+        //         update_amplitude_at_complex(state, bx, by, col, row);
+        //         // int index = blockedIndex(bx, by, state->numBlocks, row, col);
+        //         // update_amplitude_given_indices(state, index, index-block_edge_v_offset, index-default_horizontal_offset, index+block_edge_h_offset, index+default_horizontal_offset);
+        //     }
 
-            if(bx != 0 && by != state->numBlocks-1) { // bottom left
-                int col = 0;
-                int row = BLOCK_SIZE-1;
-                int index = blockedIndex(bx, by, state->numBlocks, row, col);
-                int above_index = index - BLOCK_SIZE;
-                int left_index =  blockedIndex(bx-1,by,state->numBlocks,row,col);;
-                int right_index = index + 1;
-                int below_index =  blockedIndex(bx,by+1,state->numBlocks,row,col);;
-                update_amplitude_given_indices(state, index, above_index, left_index, right_index, below_index);
-            }
+        //     if(bx != 0 && by != state->numBlocks-1) { // bottom left
+        //         int col = 0;
+        //         int row = BLOCK_SIZE-1;
+        //         update_amplitude_at_complex(state, bx, by, col, row);
+        //         // int index = blockedIndex(bx, by, state->numBlocks, row, col);
+        //         // update_amplitude_given_indices(state, index, index-default_vertical_offset, index-block_edge_h_offset, index+default_horizontal_offset, index+block_edge_v_offset);
+        //     }
 
-            if(bx != state->numBlocks-1 && by != state->numBlocks-1) { // bottom right
-                int col = BLOCK_SIZE-1;
-                int row = BLOCK_SIZE-1;
-                int index = blockedIndex(bx, by, state->numBlocks, row, col);
-                int above_index = index - BLOCK_SIZE;
-                int left_index = index - 1;
-                int right_index =  blockedIndex(bx+1,by,state->numBlocks,row,col);;
-                int below_index = blockedIndex(bx,by+1,state->numBlocks,row,col);;
-                update_amplitude_given_indices(state, index, above_index, left_index, right_index, below_index);
-            }
-        }
+        //     if(bx != state->numBlocks-1 && by != state->numBlocks-1) { // bottom right
+        //         int col = BLOCK_SIZE-1;
+        //         int row = BLOCK_SIZE-1;
+        //         update_amplitude_at_complex(state, bx, by, col, row);
+        //         // int index = blockedIndex(bx, by, state->numBlocks, row, col);
+        //         // update_amplitude_given_indices(state, index, index-default_vertical_offset, index-default_horizontal_offset, index+block_edge_h_offset, index+block_edge_v_offset);
+        //     }
+        // }
 
 
         // if(by != 0) { // skip over top row
@@ -230,16 +245,16 @@ State initState(int nx, int ny, double c, double h, double dt) {
     State foo = {
         currentFrame, lastFrame, nextFrame, nx, ny, num_blocks, alpha2
     };
-    // droplet(&foo, 5, 5, 0.5, 0.5, 3);
-    droplet(&foo, 5, 5, 0.1, 0.1, 10);
+    droplet(&foo, 5, 5, 0.5, 0.5, 3);
+    // droplet(&foo, 5, 5, 0.1, 0.1, 10);
     
     return foo;
 }
 
 
 int blockedIndex(int bx, int by, int num_blocks, int row, int col) {
-    return (BLOCK_SIZE * BLOCK_SIZE) * (by*num_blocks + bx) + // origin position of block
-            (col + row * BLOCK_SIZE);                          // position within block
+    return (BLOCK_SIZE * BLOCK_SIZE) * ((by*num_blocks) + bx) + // origin position of block
+            (col + (row * BLOCK_SIZE));                          // position within block
 }
 
 // x,y -> bi,bj,row,col
@@ -252,9 +267,8 @@ int gridIndex(int x, int y, State* state) {
 }
 
 
-int main_perf(void)
+int main(void)
 {
-    
     const int nx = 1024;
     const int ny = 1024;
     State state = initState(nx,ny,0.2,1,0.25);

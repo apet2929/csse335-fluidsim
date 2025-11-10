@@ -17,6 +17,7 @@ by Jeffery Myers is marked with CC0 1.0. To view a copy of this license, visit h
 #include <math.h>
 
 
+const int BLOCK_SIZE2 = 16;
 /*******************************************************************************************
 *
 *   raylib [models] example - heightmap rendering
@@ -37,6 +38,109 @@ static Mesh GenMeshCustom(void);    // Generate a simple triangle mesh from code
 static Image* GenHeightMapImage(void);
 static void GenHeightMapImageState(State *, Image *);
 
+struct Neighbors {
+    int index;
+    int left;
+    int right;
+    int up;
+    int down;
+};
+
+struct Neighbors getNeighbors(State* state, int bx, int by, int col, int row) {
+    int index = blockedIndex(bx, by, state->numBlocks, row, col);
+    int above_index;
+    if(row == 0) above_index = blockedIndex(bx, by-1, state->numBlocks, BLOCK_SIZE2-1, col);
+    else above_index = index - BLOCK_SIZE2;
+    
+    int left_index;
+    if(col == 0) left_index = blockedIndex(bx-1, by, state->numBlocks, row, BLOCK_SIZE2-1);
+    else left_index = index - 1;
+    
+    int right_index;
+    if(col == BLOCK_SIZE2-1) right_index = blockedIndex(bx+1, by, state->numBlocks, row, 0);
+    else right_index = index + 1;
+    
+    int below_index;
+    if(row == BLOCK_SIZE2-1) below_index = blockedIndex(bx, by+1, state->numBlocks, 0, col);
+    else below_index = index + BLOCK_SIZE2;
+    return (struct Neighbors) { index, left_index, right_index, above_index, below_index };
+}
+
+void drawGrid(State* state) {
+    for(int bx = 0; bx < state->numBlocks; bx++) {
+        for(int by = 0; by < state->numBlocks; by++) {
+            for(int col = 0; col < BLOCK_SIZE2; col++) {
+                int i = blockedIndex(bx,by,state->numBlocks,col,0);
+                state->currentFrame[i] = 0.5;
+            }
+
+            for(int col = 0; col < BLOCK_SIZE2; col++) {
+                int i = blockedIndex(bx,by,state->numBlocks,col,BLOCK_SIZE2-1);
+                state->currentFrame[i] = 0.5;
+            }
+
+            for(int row = 0; row < BLOCK_SIZE2; row++) {
+                int i = blockedIndex(bx,by,state->numBlocks,0,row);
+                state->currentFrame[i] = 0.5;
+            }
+            
+            for(int row = 0; row < BLOCK_SIZE2; row++) {
+                int i = blockedIndex(bx,by,state->numBlocks,BLOCK_SIZE2-1,row);
+                state->currentFrame[i] = 0.5;
+            }
+        }
+    }
+}
+
+void testNeighbors() {
+    State state = initState(64,64,0.2,1,1.0);
+    Color *pixels = (Color *)malloc(64*64*sizeof(Color)); 
+    Image heightMap =  {
+            .data = pixels,             // We can assign pixels directly to data
+            .width = 64,
+            .height = 64,
+            .format = PIXELFORMAT_UNCOMPRESSED_R8G8B8A8,
+            .mipmaps = 1
+    };
+    struct Neighbors ns[] = { 
+        getNeighbors(&state, 0,0,BLOCK_SIZE2-1,BLOCK_SIZE2-2), // bottom right of [0,0]
+        getNeighbors(&state, 2,1,0,0), // top left of block [2,1]
+        getNeighbors(&state, 2,1,0,BLOCK_SIZE2-1), // bottom left of block [2,1]
+        getNeighbors(&state, 2,1,BLOCK_SIZE2-1,0), // top right of block [2,1]
+        getNeighbors(&state, 2,1,BLOCK_SIZE2-5,BLOCK_SIZE2-5), // top right of block [2,1]
+    };
+
+    drawGrid(&state);
+
+    for(int nn = 0; nn < 5; nn++){
+        struct Neighbors n = ns[nn];
+        state.currentFrame[n.index] = 1.0;
+        state.currentFrame[n.left] = 0.2;
+        state.currentFrame[n.right] = 0.4;
+        state.currentFrame[n.up] = 0.6;
+        state.currentFrame[n.down] = 0.8;
+    }
+
+    GenHeightMapImageState(&state, &heightMap);
+    ExportImage(heightMap, "testNeighbors.png");
+}
+
+void testIndexing() {
+    State state = initState(64,64,0.2,1,1.0);
+    Color *pixels = (Color *)malloc(64*64*sizeof(Color)); 
+    Image heightMap =  {
+            .data = pixels,             // We can assign pixels directly to data
+            .width = 64,
+            .height = 64,
+            .format = PIXELFORMAT_UNCOMPRESSED_R8G8B8A8,
+            .mipmaps = 1
+    };
+    drawGrid(&state);
+
+    GenHeightMapImageState(&state, &heightMap);
+    ExportImage(heightMap, "testIndexing.png");
+}
+
 //------------------------------------------------------------------------------------
 // Program main entry point
 //------------------------------------------------------------------------------------
@@ -53,6 +157,9 @@ int main(void)
     screenHeight = screenHeight > ny ? screenHeight : ny;
 
     const int drawMesh = 0;
+    // testIndexing();
+    // testNeighbors();
+    // return 0;
 
     InitWindow(screenWidth, screenHeight, "raylib [models] example - heightmap rendering");
 
@@ -70,12 +177,13 @@ int main(void)
 
     Color *pixels = (Color *)malloc(nx*ny*sizeof(Color)); 
     Image heightMap =  {
-        .data = pixels,             // We can assign pixels directly to data
-        .width = nx,
-        .height = ny,
-        .format = PIXELFORMAT_UNCOMPRESSED_R8G8B8A8,
-        .mipmaps = 1
-    };
+            .data = pixels,             // We can assign pixels directly to data
+            .width = nx,
+            .height = ny,
+            .format = PIXELFORMAT_UNCOMPRESSED_R8G8B8A8,
+            .mipmaps = 1
+        };
+    
     GenHeightMapImageState(&state, &heightMap);
     // Image* heightMap = GenHeightMapImage();
     ExportImage(heightMap, "SimHeightMap.png");
@@ -147,10 +255,14 @@ int main(void)
                 DrawGrid(20, 1.0f);
 
                 EndMode3D();
+                DrawTexture(heightTexture, screenWidth - heightTexture.width - 20, 20, BLUE);
+                DrawRectangleLines(screenWidth - heightTexture.width - 20, 20, heightTexture.width, heightTexture.height, GREEN);
             }
-
-            DrawTexture(heightTexture, screenWidth - heightTexture.width - 20, 20, BLUE);
-            DrawRectangleLines(screenWidth - heightTexture.width - 20, 20, heightTexture.width, heightTexture.height, GREEN);
+            else {
+                Vector2 pos = { screenWidth/2 - screenHeight/2, 0 };
+                float scale = screenHeight / heightTexture.height;
+                DrawTextureEx(heightTexture, pos, 0.0f, scale, BLUE);
+            }
 
             DrawFPS(10, 10);
 
