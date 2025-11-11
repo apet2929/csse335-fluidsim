@@ -9,11 +9,11 @@
 const int BLOCK_SIZE = 16;
 
 
-double update_amplitude_given_indices(State *state, int index, int above_index, int left_index, int right_index, int below_index) {
-    double above = state->currentFrame[above_index];
-    double below = state->currentFrame[below_index];
-    double left = state->currentFrame[left_index];
-    double right = state->currentFrame[right_index];
+double update_amplitude_given_indices(State *state, int index, int aboveIndex, int leftIndex, int rightIndex, int belowIndex) {
+    double above = state->currentFrame[aboveIndex];
+    double below = state->currentFrame[belowIndex];
+    double left = state->currentFrame[leftIndex];
+    double right = state->currentFrame[rightIndex];
 
     double current = state->currentFrame[index];
     double last = state->lastFrame[index];
@@ -26,31 +26,72 @@ void update_left_edge(State* state, int bx, int by) {
     if(bx == 0) return;
     int blockOrigin = (BLOCK_SIZE * BLOCK_SIZE) * ((by*state->numBlocks) + bx);
     int index = blockOrigin + BLOCK_SIZE;
-    int col = 0;
-    int leftBlockOrigin = (BLOCK_SIZE * BLOCK_SIZE) * ((by*state->numBlocks) + (bx-1));
+    int leftBlockOrigin = blockOrigin - (BLOCK_SIZE * BLOCK_SIZE);
     int leftNeighbor = leftBlockOrigin + BLOCK_SIZE-1 + BLOCK_SIZE;
 
     for(int row = 1; row < BLOCK_SIZE-1; row++ ) {
-        int above_index = index - BLOCK_SIZE;
-        int left_index = leftNeighbor;
-        int right_index = index + 1;
-        int below_index = index + BLOCK_SIZE;
-        update_amplitude_given_indices(state, index, above_index, left_index, right_index, below_index);
+        int aboveIndex = index - BLOCK_SIZE;
+        int leftIndex = leftNeighbor;
+        int rightIndex = index + 1;
+        int belowIndex = index + BLOCK_SIZE;
+        update_amplitude_given_indices(state, index, aboveIndex, leftIndex, rightIndex, belowIndex);
         index += BLOCK_SIZE;
         leftNeighbor += BLOCK_SIZE;
     }
 }
 
 void update_right_edge(State* state, int bx, int by) {
-    
+    if(bx == state->numBlocks-1) return;
+    int blockOrigin = (BLOCK_SIZE * BLOCK_SIZE) * ((by*state->numBlocks) + bx);
+    int index = blockOrigin + BLOCK_SIZE-1 + BLOCK_SIZE;
+    int rightBlockOrigin = blockOrigin + (BLOCK_SIZE * BLOCK_SIZE);
+    int rightNeighbor = rightBlockOrigin + BLOCK_SIZE;
+
+    for(int row = 1; row < BLOCK_SIZE-1; row++ ) {
+        int aboveIndex = index - BLOCK_SIZE;
+        int leftIndex = index - 1;
+        int rightIndex = rightNeighbor;
+        int belowIndex = index + BLOCK_SIZE;
+        update_amplitude_given_indices(state, index, aboveIndex, leftIndex, rightIndex, belowIndex);
+        index += BLOCK_SIZE;
+        rightNeighbor += BLOCK_SIZE;
+    }
 }
 
 void update_top_edge(State* state, int bx, int by) {
-    
+    if(by == 0) return;
+    int blockOrigin = (BLOCK_SIZE * BLOCK_SIZE) * ((by*state->numBlocks) + bx);
+    int index = blockOrigin + 1;
+    int aboveBlockOrigin = blockOrigin - (BLOCK_SIZE * BLOCK_SIZE * state->numBlocks);
+    int aboveNeighbor = aboveBlockOrigin + ((BLOCK_SIZE-1) * BLOCK_SIZE) + 1;
+
+    for(int col = 1; col < BLOCK_SIZE-1; col++ ) {
+        int aboveIndex = aboveNeighbor;
+        int leftIndex = index - 1;
+        int rightIndex = index + 1;
+        int belowIndex = index + BLOCK_SIZE;
+        update_amplitude_given_indices(state, index, aboveIndex, leftIndex, rightIndex, belowIndex);
+        index += 1;
+        aboveNeighbor += 1;
+    }
 }
 
 void update_bottom_edge(State* state, int bx, int by) {
-    
+    if(by == state->numBlocks - 1) return;
+    int blockOrigin = (BLOCK_SIZE * BLOCK_SIZE) * ((by*state->numBlocks) + bx);
+    int index = blockOrigin + ((BLOCK_SIZE-1) * BLOCK_SIZE) + 1;
+    int belowBlockOrigin = blockOrigin + (BLOCK_SIZE * BLOCK_SIZE * state->numBlocks);
+    int belowNeighbor = belowBlockOrigin + 1;
+
+    for(int col = 1; col < BLOCK_SIZE-1; col++ ) {
+        int aboveIndex = index - BLOCK_SIZE;
+        int leftIndex = index - 1;
+        int rightIndex = index + 1;
+        int belowIndex = belowNeighbor;
+        update_amplitude_given_indices(state, index, aboveIndex, leftIndex, rightIndex, belowIndex);
+        index += 1;
+        belowNeighbor += 1;
+    }
 }
 
 void update_corners(State* state, int bx, int by) {
@@ -65,26 +106,26 @@ double update_amplitude_at_complex(State *state, int bx, int by, int col, int ro
     
     int index = blockedIndex(bx, by, state->numBlocks, row, col);
 
-    int above_index;
-    if(row == 0) above_index = blockedIndex(bx, by-1, state->numBlocks, BLOCK_SIZE-1, col);
-    else above_index = index - BLOCK_SIZE;
+    int aboveIndex;
+    if(row == 0) aboveIndex = blockedIndex(bx, by-1, state->numBlocks, BLOCK_SIZE-1, col);
+    else aboveIndex = index - BLOCK_SIZE;
     
-    int left_index;
-    if(col == 0) left_index = blockedIndex(bx-1, by, state->numBlocks, row, BLOCK_SIZE-1);
-    else left_index = index - 1;
+    int leftIndex;
+    if(col == 0) leftIndex = blockedIndex(bx-1, by, state->numBlocks, row, BLOCK_SIZE-1);
+    else leftIndex = index - 1;
     
-    int right_index;
-    if(col == BLOCK_SIZE-1) right_index = blockedIndex(bx+1, by, state->numBlocks, row, 0);
-    else right_index = index + 1;
+    int rightIndex;
+    if(col == BLOCK_SIZE-1) rightIndex = blockedIndex(bx+1, by, state->numBlocks, row, 0);
+    else rightIndex = index + 1;
     
-    int below_index;
-    if(row == BLOCK_SIZE-1) below_index = blockedIndex(bx, by+1, state->numBlocks, 0, col);
-    else below_index = index + BLOCK_SIZE;
+    int belowIndex;
+    if(row == BLOCK_SIZE-1) belowIndex = blockedIndex(bx, by+1, state->numBlocks, 0, col);
+    else belowIndex = index + BLOCK_SIZE;
 
-    double above = state->currentFrame[above_index];
-    double below = state->currentFrame[below_index];
-    double left = state->currentFrame[left_index];
-    double right = state->currentFrame[right_index];
+    double above = state->currentFrame[aboveIndex];
+    double below = state->currentFrame[belowIndex];
+    double left = state->currentFrame[leftIndex];
+    double right = state->currentFrame[rightIndex];
 
     double current = state->currentFrame[index];
     double last = state->lastFrame[index];
@@ -93,15 +134,15 @@ double update_amplitude_at_complex(State *state, int bx, int by, int col, int ro
 }
 
 double update_amplitude_at_simple(State *state, int index) {
-    int above_index = index - BLOCK_SIZE;
-    int left_index = index - 1;
-    int right_index = index + 1;
-    int below_index = index + BLOCK_SIZE;
+    int aboveIndex = index - BLOCK_SIZE;
+    int leftIndex = index - 1;
+    int rightIndex = index + 1;
+    int belowIndex = index + BLOCK_SIZE;
 
-    double above = state->currentFrame[above_index];
-    double below = state->currentFrame[below_index];
-    double left = state->currentFrame[left_index];
-    double right = state->currentFrame[right_index];
+    double above = state->currentFrame[aboveIndex];
+    double below = state->currentFrame[belowIndex];
+    double left = state->currentFrame[leftIndex];
+    double right = state->currentFrame[rightIndex];
 
     double current = state->currentFrame[index];
     double last = state->lastFrame[index];
@@ -140,15 +181,20 @@ void simulate_tick(State *state) {
         //     }
         // }
 
-        for(int row = 0; row < BLOCK_SIZE; row++) {
-            for(int col = 1; col < BLOCK_SIZE; col++) {
+        for(int row = 1; row < BLOCK_SIZE-1; row++) {
+            for(int col = 1; col < BLOCK_SIZE-1; col++) {
                 update_amplitude_at_complex(state, bx, by, col, row);
             }
         }
 
         update_left_edge(state, bx, by);
+        update_right_edge(state, bx, by);
+        update_top_edge(state, bx, by);
+        update_bottom_edge(state, bx, by);
         update_amplitude_at_complex(state, bx, by, 0, 0);
         update_amplitude_at_complex(state, bx, by, 0, BLOCK_SIZE-1);
+        update_amplitude_at_complex(state, bx, by, BLOCK_SIZE-1, 0);
+        update_amplitude_at_complex(state, bx, by, BLOCK_SIZE-1, BLOCK_SIZE-1);
 
 
         // 1 2 3    10 11 12    ... x num_blocks
@@ -289,6 +335,9 @@ State initState(int nx, int ny, double c, double h, double dt) {
     };
     droplet(&foo, 5, 5, 0.5, 0.5, 3);
     // droplet(&foo, 5, 5, 0.1, 0.1, 10);
+
+    // foo.currentFrame[gridIndex(nx*0.5, ny*0.5, &foo)] = 10;
+    // foo.lastFrame[gridIndex(nx*0.5, ny*0.5, &foo)] = 10;
     
     return foo;
 }
