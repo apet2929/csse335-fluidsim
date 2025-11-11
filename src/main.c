@@ -46,7 +46,35 @@ struct Neighbors {
     int down;
 };
 
+
+// int left_neighbor_index(int blockOrigin, int row) {
+//     int leftBlockOrigin = blockOrigin - (BLOCK_SIZE2 * BLOCK_SIZE2);
+//     return leftBlockOrigin + (BLOCK_SIZE2-1) + (BLOCK_SIZE2*row); // + (BLOCK_SIZE2-1) moves to the right edge of the block
+// }
+
+// int right_neighbor_index(int blockOrigin, int row) {
+//     int rightBlockOrigin = blockOrigin + (BLOCK_SIZE2 * BLOCK_SIZE2);
+//     return rightBlockOrigin + (BLOCK_SIZE2*row);
+// }
+
+// int top_neighbor_index(State* state, int blockOrigin, int col) {
+//     int topBlockOrigin = blockOrigin - (BLOCK_SIZE2 * BLOCK_SIZE2 * state->numBlocks);
+//     return topBlockOrigin + (BLOCK_SIZE2 * (BLOCK_SIZE2-1)) + col;
+// }
+
+// int bottom_neighbor_index(State* state, int blockOrigin, int col) {
+//     int bottomBlockOrigin = blockOrigin + (BLOCK_SIZE2 * BLOCK_SIZE2 * state->numBlocks);
+//     return bottomBlockOrigin + col;
+// }
+
+
+// int getBlockOrigin(State* state, int bx, int by) {
+//     return (BLOCK_SIZE2 * BLOCK_SIZE2) * ((by*state->numBlocks) + bx);
+// }
+
+
 struct Neighbors getNeighbors(State* state, int bx, int by, int col, int row) {
+    int blockOrigin = getBlockOrigin(state,bx,by);
     int index = blockedIndex(bx, by, state->numBlocks, row, col);
     int above_index;
     if(row == 0) above_index = blockedIndex(bx, by-1, state->numBlocks, BLOCK_SIZE2-1, col);
@@ -54,17 +82,16 @@ struct Neighbors getNeighbors(State* state, int bx, int by, int col, int row) {
     
     int left_index;
     if(col == 0) {
-        left_index = blockedIndex(bx-1, by, state->numBlocks, row, BLOCK_SIZE2-1);
-        printf("i=%d l=%d i-l=%d\n", index, left_index, index-left_index);
+        left_index = left_neighbor_index(blockOrigin, row);
     }
     else left_index = index - 1;
     
     int right_index;
-    if(col == BLOCK_SIZE2-1) right_index = blockedIndex(bx+1, by, state->numBlocks, row, 0);
+    if(col == BLOCK_SIZE2-1) right_index = right_neighbor_index(blockOrigin, row);
     else right_index = index + 1;
     
     int below_index;
-    if(row == BLOCK_SIZE2-1) below_index = blockedIndex(bx, by+1, state->numBlocks, 0, col);
+    if(row == BLOCK_SIZE2-1) below_index = bottom_neighbor_index(state, blockOrigin, col);
     else below_index = index + BLOCK_SIZE2;
     return (struct Neighbors) { index, left_index, right_index, above_index, below_index };
 }
@@ -105,37 +132,25 @@ void testNeighbors() {
             .format = PIXELFORMAT_UNCOMPRESSED_R8G8B8A8,
             .mipmaps = 1
     };
-    // struct Neighbors ns[] = { 
-    //     getNeighbors(&state, 0,0,BLOCK_SIZE2-1,BLOCK_SIZE2-2), // bottom right of [0,0]
-    //     getNeighbors(&state, 2,1,0,0), // top left of block [2,1]
-    //     getNeighbors(&state, 2,1,0,BLOCK_SIZE2-1), // bottom left of block [2,1]
-    //     getNeighbors(&state, 2,1,BLOCK_SIZE2-1,0), // top right of block [2,1]
-    //     getNeighbors(&state, 2,1,BLOCK_SIZE2-5,BLOCK_SIZE2-5), // top right of block [2,1]
-    // };
+    struct Neighbors ns[] = { 
+        getNeighbors(&state, 0,0,BLOCK_SIZE2-1,BLOCK_SIZE2-1), // bottom right of [0,0]
+        // getNeighbors(&state, 2,1,0,0), // top left of block [2,1]
+        // getNeighbors(&state, 2,1,0,BLOCK_SIZE2-1), // bottom left of block [2,1]
+        // getNeighbors(&state, 2,1,BLOCK_SIZE2-1,0), // top right of block [2,1]
+        // getNeighbors(&state, 2,1,BLOCK_SIZE2-5,BLOCK_SIZE2-5), // top right of block [2,1]
+    };
 
-    drawGrid(&state);
+    // drawGrid(&state);
 
-    // for(int nn = 0; nn < 5; nn++){
-    //     struct Neighbors n = ns[nn];
-    //     state.currentFrame[n.index] = 1.0;
-    //     state.currentFrame[n.left] = 0.2;
-    //     state.currentFrame[n.right] = 0.4;
-    //     state.currentFrame[n.up] = 0.6;
-    //     state.currentFrame[n.down] = 0.8;
-    // }
-    int bx = 1;
-    int by = 1;
-    int blockOrigin = (BLOCK_SIZE2 * BLOCK_SIZE2) * ((by*state.numBlocks) + bx);
-    int index = blockOrigin + BLOCK_SIZE2;
-    int leftBlockOrigin = (BLOCK_SIZE2 * BLOCK_SIZE2) * ((by*state.numBlocks) + (bx-1));
-    int leftNeighbor = leftBlockOrigin + BLOCK_SIZE2-1 + BLOCK_SIZE2;
-    int col = 0;
-    for(int row = 1; row < BLOCK_SIZE2-1; row++) {
-        state.currentFrame[leftNeighbor] = 0.1;
-        state.currentFrame[index] = 1.0;
-        index += BLOCK_SIZE2;
-        leftNeighbor += BLOCK_SIZE2;
+    for(int nn = 0; nn < 1; nn++){
+        struct Neighbors n = ns[nn];
+        state.currentFrame[n.index] = 1.0;
+        state.currentFrame[n.left] = 0.2;
+        state.currentFrame[n.right] = 0.4;
+        state.currentFrame[n.up] = 0.6;
+        state.currentFrame[n.down] = 1.0;
     }
+
 
     GenHeightMapImageState(&state, &heightMap);
     ExportImage(heightMap, "testNeighbors.png");
