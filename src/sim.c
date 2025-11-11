@@ -323,7 +323,7 @@ int gridIndex(int x, int y, State* state) {
 }
 
 
-int main(void)
+int main_perf(void)
 {
     const int nx = 1024;
     const int ny = 1024;
