@@ -9,6 +9,31 @@
 const int BLOCK_SIZE = 16;
 
 
+
+int left_neighbor_index(int blockOrigin, int row) {
+    int leftBlockOrigin = blockOrigin - (BLOCK_SIZE * BLOCK_SIZE);
+    return leftBlockOrigin + (BLOCK_SIZE-1) + (BLOCK_SIZE*row); // + (BLOCK_SIZE-1) moves to the right edge of the block
+}
+
+int right_neighbor_index(int blockOrigin, int row) {
+    int rightBlockOrigin = blockOrigin + (BLOCK_SIZE * BLOCK_SIZE);
+    return rightBlockOrigin + (BLOCK_SIZE*row);
+}
+
+int top_neighbor_index(State* state, int blockOrigin, int col) {
+    int topBlockOrigin = blockOrigin - (BLOCK_SIZE * BLOCK_SIZE * state->numBlocks);
+    return topBlockOrigin + (BLOCK_SIZE * (BLOCK_SIZE-1)) + col;
+}
+
+int bottom_neighbor_index(State* state, int blockOrigin, int col) {
+    int bottomBlockOrigin = blockOrigin + (BLOCK_SIZE * BLOCK_SIZE * state->numBlocks);
+    return bottomBlockOrigin + col;
+}
+
+int getBlockOrigin(State* state, int bx, int by) {
+    return (BLOCK_SIZE * BLOCK_SIZE) * ((by*state->numBlocks) + bx);
+}
+
 double update_amplitude_given_indices(State *state, int index, int above_index, int left_index, int right_index, int below_index) {
     double above = state->currentFrame[above_index];
     double below = state->currentFrame[below_index];
@@ -26,9 +51,7 @@ void update_left_edge(State* state, int bx, int by) {
     if(bx == 0) return;
     int blockOrigin = (BLOCK_SIZE * BLOCK_SIZE) * ((by*state->numBlocks) + bx);
     int index = blockOrigin + BLOCK_SIZE;
-    int col = 0;
-    int leftBlockOrigin = (BLOCK_SIZE * BLOCK_SIZE) * ((by*state->numBlocks) + (bx-1));
-    int leftNeighbor = leftBlockOrigin + BLOCK_SIZE-1 + BLOCK_SIZE;
+    int leftNeighbor = left_neighbor_index(blockOrigin, 1);
 
     for(int row = 1; row < BLOCK_SIZE-1; row++ ) {
         int above_index = index - BLOCK_SIZE;
@@ -42,19 +65,118 @@ void update_left_edge(State* state, int bx, int by) {
 }
 
 void update_right_edge(State* state, int bx, int by) {
-    
+    if(bx == state->numBlocks) return;
+    int blockOrigin = (BLOCK_SIZE * BLOCK_SIZE) * ((by*state->numBlocks) + bx);
+    int index = blockOrigin + BLOCK_SIZE;
+    int rightNeighbor = right_neighbor_index(blockOrigin, 1);
+
+    for(int row = 1; row < BLOCK_SIZE-1; row++ ) {
+        int above_index = index - BLOCK_SIZE;
+        int right_index = rightNeighbor;
+        int left_index = index - 1;
+        int below_index = index + BLOCK_SIZE;
+        update_amplitude_given_indices(state, index, above_index, left_index, right_index, below_index);
+        index += BLOCK_SIZE;
+        rightNeighbor += BLOCK_SIZE;
+    }
 }
 
 void update_top_edge(State* state, int bx, int by) {
-    
+    if(bx == state->numBlocks) return;
+    int blockOrigin = (BLOCK_SIZE * BLOCK_SIZE) * ((by*state->numBlocks) + bx);
+    int index = blockOrigin + 1;
+    int upperNeighbor = top_neighbor_index(state, blockOrigin, 1);
+
+    for(int col = 1; col < BLOCK_SIZE-1; col++ ) {
+        int above_index = upperNeighbor;
+        int right_index = index + 1;
+        int left_index = index - 1;
+        int below_index = index + BLOCK_SIZE;
+        update_amplitude_given_indices(state, index, above_index, left_index, right_index, below_index);
+        index += 1;
+        upperNeighbor += 1;
+    }
 }
 
 void update_bottom_edge(State* state, int bx, int by) {
-    
+    if(bx == state->numBlocks) return;
+    int blockOrigin = (BLOCK_SIZE * BLOCK_SIZE) * ((by*state->numBlocks) + bx);
+    int index = blockOrigin + 1;
+    int lowerNeighbor = bottom_neighbor_index(state, blockOrigin, 1);
+
+    for(int col = 1; col < BLOCK_SIZE-1; col++ ) {
+        int above_index = index - BLOCK_SIZE;
+        int right_index = index + 1;
+        int left_index = index - 1;
+        int below_index = lowerNeighbor;
+        update_amplitude_given_indices(state, index, above_index, left_index, right_index, below_index);
+        index += 1;
+        lowerNeighbor += 1;
+    }
 }
 
-void update_corners(State* state, int bx, int by) {
 
+void update_corners(State* state, int bx, int by) {
+    int blockOrigin = (BLOCK_SIZE * BLOCK_SIZE) * ((by*state->numBlocks) + bx);
+    
+    int left_neighbor = left_neighbor_index(blockOrigin, 0);
+    int above_neighbor = top_neighbor_index(state, blockOrigin, 0); 
+    int below_neighbor = bottom_neighbor_index(state, blockOrigin, 0); 
+    int right_neighbor = right_neighbor_index(blockOrigin, 0);
+    int lower_left_neighbor = left_neighbor + (BLOCK_SIZE * (BLOCK_SIZE-1)); // move down to bottom row
+    int lower_right_neighbor = right_neighbor + (BLOCK_SIZE * (BLOCK_SIZE-1));
+    int righter_above_neighbor = above_neighbor + (BLOCK_SIZE-1); // move to rightmost column
+    int righter_below_neighbor = below_neighbor + (BLOCK_SIZE-1);
+    // top left
+    if(bx != 0 && by != 0) {
+        int index = blockOrigin;
+        int right_index = index + 1;
+        int below_index = index + BLOCK_SIZE;
+        update_amplitude_given_indices(state, index, above_neighbor, left_neighbor, right_index, below_index);
+    }
+
+    // bottom left
+    if(bx != 0 && by != state->numBlocks) {
+        int col = 0;
+        int row = BLOCK_SIZE-1;
+
+        int index = blockOrigin + BLOCK_SIZE;
+        int right_index = index + 1;
+        int above_index = index - BLOCK_SIZE;
+        
+        update_amplitude_given_indices(state, index, above_index, lower_left_neighbor, right_index, below_neighbor);
+    }
+
+    
+    // bottom right
+    if(bx != state->numBlocks && by != state->numBlocks) {
+        int col = 0;
+        int row = BLOCK_SIZE-1;
+
+        int index = blockOrigin + BLOCK_SIZE;
+        int rightBlockOrigin = blockOrigin + (BLOCK_SIZE * BLOCK_SIZE);
+        int right_neighbor = rightBlockOrigin + (BLOCK_SIZE*row);
+        int above_index = index - BLOCK_SIZE;
+        int left_index = index - 1;
+        int below_neighbor = blockedIndex(bx, by+1, state->numBlocks, BLOCK_SIZE-1, col); // TODO: Steal from update bottom edge
+
+        update_amplitude_given_indices(state, index, above_index, left_index, lower_right_neighbor, righter_below_neighbor);
+    }
+
+    // top right
+    if(bx != state->numBlocks && by != 0) {
+        int col = 0;
+        int row = 0;
+
+        int index = blockOrigin + BLOCK_SIZE;
+        int rightBlockOrigin = blockOrigin + (BLOCK_SIZE * BLOCK_SIZE);
+        int right_neighbor = rightBlockOrigin + BLOCK_SIZE-1 + BLOCK_SIZE;
+        int below_index = index + BLOCK_SIZE;
+        int left_index = index-1;
+        int above_neighbor = blockedIndex(bx, by-1, state->numBlocks, BLOCK_SIZE-1, col); // TODO: Steal from update top edge
+
+        update_amplitude_given_indices(state, index, righter_above_neighbor, left_index, right_neighbor, below_index);
+    }
 }
 
 
@@ -147,9 +269,10 @@ void simulate_tick(State *state) {
         }
 
         update_left_edge(state, bx, by);
-        update_amplitude_at_complex(state, bx, by, 0, 0);
-        update_amplitude_at_complex(state, bx, by, 0, BLOCK_SIZE-1);
-
+        update_right_edge(state,bx,by);
+        update_bottom_edge(state,bx,by);
+        update_top_edge(state,bx,by);
+        update_corners(state, bx, by);
 
         // 1 2 3    10 11 12    ... x num_blocks
         // 4 5 6    13 14 15    ... x num_blocks
