@@ -151,7 +151,6 @@ void update_corners(State* state, int bx, int by) {
         int index = blockOrigin + (BLOCK_SIZE * (BLOCK_SIZE-1)) + BLOCK_SIZE-1;
         int above_index = index - BLOCK_SIZE;
         int left_index = index - 1;
-        
         update_amplitude_given_indices(state, index, above_index, left_index, lower_right_neighbor, righter_below_neighbor);
     }
 
@@ -160,9 +159,6 @@ void update_corners(State* state, int bx, int by) {
         int index = blockOrigin + BLOCK_SIZE-1;
         int below_index = index + BLOCK_SIZE;
         int left_index = index-1;
-        righter_above_neighbor = blockedIndex(bx,by-1, state->numBlocks, BLOCK_SIZE-1,BLOCK_SIZE-1);
-        right_neighbor = blockedIndex(bx+1,by, state->numBlocks, 0, 0);
-        
         update_amplitude_given_indices(state, index, righter_above_neighbor, left_index, right_neighbor, below_index);
     }
 }
@@ -260,7 +256,8 @@ void simulate_tick(State *state) {
         update_right_edge(state, bx, by);
         update_top_edge(state, bx, by);
         update_bottom_edge(state, bx, by);
-        update_corners(state,bx,by);        
+        update_corners(state,bx,by); 
+
     }
 
 
