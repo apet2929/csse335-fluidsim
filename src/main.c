@@ -179,30 +179,27 @@ int main(void)
 {
     // Initialization
     //--------------------------------------------------------------------------------------
-    const int nx = 128;
-    const int ny = 128;
+    const int nx = 176;
+    const int ny = 176;
 
-    int screenWidth = 800;
-    int screenHeight = 450;
+    int screenWidth = 700;
+    int screenHeight = 700;
     screenWidth = screenWidth > nx ? screenWidth : nx;
     screenHeight = screenHeight > ny ? screenHeight : ny;
 
-    const int drawMesh = 0;
-    // testIndexing();
-    // testNeighbors();
-    // return 0;
+    const int drawMesh = 1;
 
     InitWindow(screenWidth, screenHeight, "raylib [models] example - heightmap rendering");
 
     // Define our custom camera to look into our 3d world
     Camera camera = { 0 };
-    camera.position = (Vector3){ 18.0f, 21.0f, 18.0f };     // Camera position
+    camera.position = (Vector3){ 18.0f, 10.0f, 18.0f };     // Camera position
     camera.target = (Vector3){ 0.0f, 0.0f, 0.0f };          // Camera looking at point
     camera.up = (Vector3){ 0.0f, 1.0f, 0.0f };              // Camera up vector (rotation towards target)
     camera.fovy = 45.0f;                                    // Camera field-of-view Y
     camera.projection = CAMERA_PERSPECTIVE;                 // Camera projection type
 
-    Vector3 mapPosition = { -8.0f, 10.0f, -8.0f };           // Define model position
+    Vector3 mapPosition = { 0.0f, 5.0f, 0.0f };           // Define model position
 
     State state = initState(nx,ny,0.2,1,1.0);
 
@@ -216,7 +213,6 @@ int main(void)
         };
     
     GenHeightMapImageState(&state, &heightMap);
-    // Image* heightMap = GenHeightMapImage();
     ExportImage(heightMap, "SimHeightMap.png");
 	Texture2D heightTexture = LoadTextureFromImage(heightMap);        // Convert image to texture (VRAM)
     Mesh newMesh;
@@ -226,10 +222,6 @@ int main(void)
         Model newModel = LoadModelFromMesh(newMesh);                  // Load model from generated mesh
         newModel.materials[0].maps[MATERIAL_MAP_DIFFUSE].texture = heightTexture; // Set map diffuse texture
     }
-
-
-    // UnloadImage(image);             // Unload heightmap image from RAM, already uploaded to VRAM
-	// UnloadImage(heightMap);             // Unload heightmap image from RAM, already uploaded to VRAM
 
     SetTargetFPS(60);               // Set our game to run at 60 frames-per-second
     //--------------------------------------------------------------------------------------
@@ -282,7 +274,7 @@ int main(void)
             if (drawMesh) {
                 BeginMode3D(camera);
 
-                DrawModel(newModel, mapPosition, 0.25f,  Fade(BLUE, 0.5f));
+                DrawModel(newModel, mapPosition, 0.5f,  Fade(BLUE, 0.5f));
                 DrawGrid(20, 1.0f);
 
                 EndMode3D();

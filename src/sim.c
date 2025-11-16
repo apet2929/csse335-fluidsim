@@ -5,7 +5,7 @@
 #include <stdio.h>
 #include <omp.h>
 #include <time.h>
-#define PERF
+
 const int BLOCK_SIZE = 16;
 
 
@@ -46,124 +46,6 @@ double update_amplitude_given_indices(State *state, int index, int above_index, 
 }
 
 
-void update_left_edge(State* state, int bx, int by) {
-    if(bx == 0) return;
-    int blockOrigin = (BLOCK_SIZE * BLOCK_SIZE) * ((by*state->numBlocks) + bx);
-    int index = blockOrigin + BLOCK_SIZE;
-    int leftBlockOrigin = blockOrigin - (BLOCK_SIZE * BLOCK_SIZE);
-    int leftNeighbor = leftBlockOrigin + BLOCK_SIZE-1 + BLOCK_SIZE;
-
-    for(int row = 1; row < BLOCK_SIZE-1; row++ ) {
-        int aboveIndex = index - BLOCK_SIZE;
-        int leftIndex = leftNeighbor;
-        int rightIndex = index + 1;
-        int belowIndex = index + BLOCK_SIZE;
-        update_amplitude_given_indices(state, index, aboveIndex, leftIndex, rightIndex, belowIndex);
-        index += BLOCK_SIZE;
-        leftNeighbor += BLOCK_SIZE;
-    }
-}
-
-void update_right_edge(State* state, int bx, int by) {
-    if(bx == state->numBlocks-1) return;
-    int blockOrigin = (BLOCK_SIZE * BLOCK_SIZE) * ((by*state->numBlocks) + bx);
-    int index = blockOrigin + BLOCK_SIZE-1 + BLOCK_SIZE;
-    int rightBlockOrigin = blockOrigin + (BLOCK_SIZE * BLOCK_SIZE);
-    int rightNeighbor = rightBlockOrigin + BLOCK_SIZE;
-
-    for(int row = 1; row < BLOCK_SIZE-1; row++ ) {
-        int aboveIndex = index - BLOCK_SIZE;
-        int leftIndex = index - 1;
-        int rightIndex = rightNeighbor;
-        int belowIndex = index + BLOCK_SIZE;
-        update_amplitude_given_indices(state, index, aboveIndex, leftIndex, rightIndex, belowIndex);
-        index += BLOCK_SIZE;
-        rightNeighbor += BLOCK_SIZE;
-    }
-}
-
-void update_top_edge(State* state, int bx, int by) {
-    if(by == 0) return;
-    int blockOrigin = (BLOCK_SIZE * BLOCK_SIZE) * ((by*state->numBlocks) + bx);
-    int index = blockOrigin + 1;
-    int aboveBlockOrigin = blockOrigin - (BLOCK_SIZE * BLOCK_SIZE * state->numBlocks);
-    int aboveNeighbor = aboveBlockOrigin + ((BLOCK_SIZE-1) * BLOCK_SIZE) + 1;
-
-    for(int col = 1; col < BLOCK_SIZE-1; col++ ) {
-        int aboveIndex = aboveNeighbor;
-        int leftIndex = index - 1;
-        int rightIndex = index + 1;
-        int belowIndex = index + BLOCK_SIZE;
-        update_amplitude_given_indices(state, index, aboveIndex, leftIndex, rightIndex, belowIndex);
-        index += 1;
-        aboveNeighbor += 1;
-    }
-}
-
-void update_bottom_edge(State* state, int bx, int by) {
-    if(by == state->numBlocks - 1) return;
-    int blockOrigin = (BLOCK_SIZE * BLOCK_SIZE) * ((by*state->numBlocks) + bx);
-    int index = blockOrigin + ((BLOCK_SIZE-1) * BLOCK_SIZE) + 1;
-    int belowBlockOrigin = blockOrigin + (BLOCK_SIZE * BLOCK_SIZE * state->numBlocks);
-    int belowNeighbor = belowBlockOrigin + 1;
-
-    for(int col = 1; col < BLOCK_SIZE-1; col++ ) {
-        int aboveIndex = index - BLOCK_SIZE;
-        int leftIndex = index - 1;
-        int rightIndex = index + 1;
-        int belowIndex = belowNeighbor;
-        update_amplitude_given_indices(state, index, aboveIndex, leftIndex, rightIndex, belowIndex);
-        index += 1;
-        belowNeighbor += 1;
-    }
-}
-
-void update_corners(State* state, int bx, int by) {
-    int blockOrigin = (BLOCK_SIZE * BLOCK_SIZE) * ((by*state->numBlocks) + bx);
-    
-    int left_neighbor = left_neighbor_index(blockOrigin, 0);
-    int above_neighbor = top_neighbor_index(state, blockOrigin, 0); 
-    int below_neighbor = bottom_neighbor_index(state, blockOrigin, 0); 
-    int right_neighbor = right_neighbor_index(blockOrigin, 0);
-    int lower_left_neighbor = left_neighbor + (BLOCK_SIZE * (BLOCK_SIZE-1)); // move down to bottom row
-    int lower_right_neighbor = right_neighbor + (BLOCK_SIZE * (BLOCK_SIZE-1));
-    int righter_above_neighbor = above_neighbor + (BLOCK_SIZE-1); // move to rightmost column
-    int righter_below_neighbor = below_neighbor + (BLOCK_SIZE-1);
-    // top left
-    if(bx != 0 && by != 0) {
-        int index = blockOrigin;
-        int right_index = index + 1;
-        int below_index = index + BLOCK_SIZE;
-        update_amplitude_given_indices(state, index, above_neighbor, left_neighbor, right_index, below_index);
-    }
-
-    // bottom left
-    if(bx != 0 && by != state->numBlocks) {
-        int index = blockOrigin + (BLOCK_SIZE * (BLOCK_SIZE-1));
-        int right_index = index + 1;
-        int above_index = index - BLOCK_SIZE;
-        
-        update_amplitude_given_indices(state, index, above_index, lower_left_neighbor, right_index, below_neighbor);
-    }
-    
-    // // bottom right
-    if(bx != state->numBlocks && by != state->numBlocks) {
-        int index = blockOrigin + (BLOCK_SIZE * (BLOCK_SIZE-1)) + BLOCK_SIZE-1;
-        int above_index = index - BLOCK_SIZE;
-        int left_index = index - 1;
-        update_amplitude_given_indices(state, index, above_index, left_index, lower_right_neighbor, righter_below_neighbor);
-    }
-
-    // // top right
-    if(bx != state->numBlocks && by != 0) {
-        int index = blockOrigin + BLOCK_SIZE-1;
-        int below_index = index + BLOCK_SIZE;
-        int left_index = index-1;
-        update_amplitude_given_indices(state, index, righter_above_neighbor, left_index, right_neighbor, below_index);
-    }
-}
-
-
 double update_amplitude_at_complex(State *state, int bx, int by, int col, int row) {
     // edges of the grid
     if((bx == 0 && col == 0) || (bx == state->numBlocks-1 && col == BLOCK_SIZE-1)) return 0.0;
@@ -197,6 +79,133 @@ double update_amplitude_at_complex(State *state, int bx, int by, int col, int ro
 
     state->nextFrame[index] = state->alpha2 * (above + below + left + right - 4*current) + 2*current - last;
 }
+
+
+void update_left_edge(State* state, int bx, int by) {
+    if(bx == 0) return;
+    int blockOrigin = (BLOCK_SIZE * BLOCK_SIZE) * ((by*state->numBlocks) + bx);
+    int index = blockOrigin + BLOCK_SIZE;
+    int leftBlockOrigin = blockOrigin - (BLOCK_SIZE * BLOCK_SIZE);
+    int leftNeighbor = leftBlockOrigin + BLOCK_SIZE-1 + BLOCK_SIZE;
+
+    for(int row = 1; row < BLOCK_SIZE-1; row++ ) {
+        update_amplitude_at_complex(state, bx, by, 0, row);
+        // int aboveIndex = index - BLOCK_SIZE;
+        // int leftIndex = leftNeighbor;
+        // int rightIndex = index + 1;
+        // int belowIndex = index + BLOCK_SIZE;
+        // update_amplitude_given_indices(state, index, aboveIndex, leftIndex, rightIndex, belowIndex);
+        // index += BLOCK_SIZE;
+        // leftNeighbor += BLOCK_SIZE;
+    }
+}
+
+void update_right_edge(State* state, int bx, int by) {
+    if(bx == state->numBlocks-1) return;
+    int blockOrigin = (BLOCK_SIZE * BLOCK_SIZE) * ((by*state->numBlocks) + bx);
+    int index = blockOrigin + BLOCK_SIZE-1 + BLOCK_SIZE;
+    int rightBlockOrigin = blockOrigin + (BLOCK_SIZE * BLOCK_SIZE);
+    int rightNeighbor = rightBlockOrigin + BLOCK_SIZE;
+
+    for(int row = 1; row < BLOCK_SIZE-1; row++ ) {
+        update_amplitude_at_complex(state, bx, by, BLOCK_SIZE-1, row);
+        // int aboveIndex = index - BLOCK_SIZE;
+        // int leftIndex = index - 1;
+        // int rightIndex = rightNeighbor;
+        // int belowIndex = index + BLOCK_SIZE;
+        // update_amplitude_given_indices(state, index, aboveIndex, leftIndex, rightIndex, belowIndex);
+        // index += BLOCK_SIZE;
+        // rightNeighbor += BLOCK_SIZE;
+    }
+}
+
+void update_top_edge(State* state, int bx, int by) {
+    if(by == 0) return;
+    int blockOrigin = (BLOCK_SIZE * BLOCK_SIZE) * ((by*state->numBlocks) + bx);
+    int index = blockOrigin + 1;
+    int aboveBlockOrigin = blockOrigin - (BLOCK_SIZE * BLOCK_SIZE * state->numBlocks);
+    int aboveNeighbor = aboveBlockOrigin + ((BLOCK_SIZE-1) * BLOCK_SIZE) + 1;
+
+    for(int col = 1; col < BLOCK_SIZE-1; col++ ) {
+        update_amplitude_at_complex(state, bx, by, col, 0);
+        // int aboveIndex = aboveNeighbor;
+        // int leftIndex = index - 1;
+        // int rightIndex = index + 1;
+        // int belowIndex = index + BLOCK_SIZE;
+        // update_amplitude_given_indices(state, index, aboveIndex, leftIndex, rightIndex, belowIndex);
+        // index += 1;
+        // aboveNeighbor += 1;
+    }
+}
+
+void update_bottom_edge(State* state, int bx, int by) {
+    if(by == state->numBlocks - 1) return;
+    int blockOrigin = (BLOCK_SIZE * BLOCK_SIZE) * ((by*state->numBlocks) + bx);
+    int index = blockOrigin + ((BLOCK_SIZE-1) * BLOCK_SIZE) + 1;
+    int belowBlockOrigin = blockOrigin + (BLOCK_SIZE * BLOCK_SIZE * state->numBlocks);
+    int belowNeighbor = belowBlockOrigin + 1;
+
+    for(int col = 1; col < BLOCK_SIZE-1; col++ ) {
+        update_amplitude_at_complex(state, bx, by, col, BLOCK_SIZE-1);
+        // int aboveIndex = index - BLOCK_SIZE;
+        // int leftIndex = index - 1;
+        // int rightIndex = index + 1;
+        // int belowIndex = belowNeighbor;
+        // update_amplitude_given_indices(state, index, aboveIndex, leftIndex, rightIndex, belowIndex);
+        // index += 1;
+        // belowNeighbor += 1;
+    }
+}
+
+void update_corners(State* state, int bx, int by) {
+    int blockOrigin = (BLOCK_SIZE * BLOCK_SIZE) * ((by*state->numBlocks) + bx);
+    
+    int left_neighbor = left_neighbor_index(blockOrigin, 0);
+    int above_neighbor = top_neighbor_index(state, blockOrigin, 0); 
+    int below_neighbor = bottom_neighbor_index(state, blockOrigin, 0); 
+    int right_neighbor = right_neighbor_index(blockOrigin, 0);
+    int lower_left_neighbor = left_neighbor + (BLOCK_SIZE * (BLOCK_SIZE-1)); // move down to bottom row
+    int lower_right_neighbor = right_neighbor + (BLOCK_SIZE * (BLOCK_SIZE-1));
+    int righter_above_neighbor = above_neighbor + (BLOCK_SIZE-1); // move to rightmost column
+    int righter_below_neighbor = below_neighbor + (BLOCK_SIZE-1);
+    // top left
+    if(bx != 0 && by != 0) {
+        int index = blockOrigin;
+        int right_index = index + 1;
+        int below_index = index + BLOCK_SIZE;
+        update_amplitude_at_complex(state, bx, by, 0, 0);
+        // update_amplitude_given_indices(state, index, above_neighbor, left_neighbor, right_index, below_index);
+    }
+
+    // bottom left
+    if(bx != 0 && by != state->numBlocks) {
+        int index = blockOrigin + (BLOCK_SIZE * (BLOCK_SIZE-1));
+        int right_index = index + 1;
+        int above_index = index - BLOCK_SIZE;
+        update_amplitude_at_complex(state, bx, by, 0, BLOCK_SIZE-1);
+        // update_amplitude_given_indices(state, index, above_index, lower_left_neighbor, right_index, below_neighbor);
+    }
+    
+    // // bottom right
+    if(bx != state->numBlocks && by != state->numBlocks) {
+        int index = blockOrigin + (BLOCK_SIZE * (BLOCK_SIZE-1)) + BLOCK_SIZE-1;
+        int above_index = index - BLOCK_SIZE;
+        int left_index = index - 1;
+        update_amplitude_at_complex(state, bx, by, BLOCK_SIZE-1, BLOCK_SIZE-1);
+        // update_amplitude_given_indices(state, index, above_index, left_index, lower_right_neighbor, righter_below_neighbor);
+    }
+
+    // // top right
+    if(bx != state->numBlocks && by != 0) {
+        int index = blockOrigin + BLOCK_SIZE-1;
+        int below_index = index + BLOCK_SIZE;
+        int left_index = index-1;
+        update_amplitude_at_complex(state, bx, by, BLOCK_SIZE-1, 0);
+        // update_amplitude_given_indices(state, index, righter_above_neighbor, left_index, right_neighbor, below_index);
+    }
+}
+
+
 
 double update_amplitude_at_simple(State *state, int index) {
     int aboveIndex = index - BLOCK_SIZE;
@@ -240,17 +249,17 @@ void simulate_tick(State *state) {
         int bx = block_index % state->numBlocks;
         int by = block_index / state->numBlocks;
         
-        // for(int row = 1; row < BLOCK_SIZE - 1; row++) {
-        //     for(int col = 1; col < BLOCK_SIZE - 1; col++) {
-        //         update_amplitude_at_simple(state, blockedIndex(bx,by,state->numBlocks,row,col));
-        //     }
-        // }
-
-        for(int row = 1; row < BLOCK_SIZE-1; row++) {
-            for(int col = 1; col < BLOCK_SIZE-1; col++) {
-                update_amplitude_at_complex(state, bx, by, col, row);
+        for(int row = 1; row < BLOCK_SIZE - 1; row++) {
+            for(int col = 1; col < BLOCK_SIZE - 1; col++) {
+                update_amplitude_at_simple(state, blockedIndex(bx,by,state->numBlocks,row,col));
             }
         }
+
+        // for(int row = 1; row < BLOCK_SIZE-1; row++) {
+            // for(int col = 1; col < BLOCK_SIZE-1; col++) {
+                // update_amplitude_at_complex(state, bx, by, col, row);
+            // }
+        // }
 
         update_left_edge(state, bx, by);
         update_right_edge(state, bx, by);
@@ -296,7 +305,8 @@ State initState(int nx, int ny, double c, double h, double dt) {
         currentFrame, lastFrame, nextFrame, nx, ny, num_blocks, alpha2
     };
     droplet(&foo, 5, 5, 0.5, 0.5, 3);
-    // droplet(&foo, 5, 5, 0.1, 0.1, 10);
+    droplet(&foo, 5, 5, 0.1, 0.1, 3);
+    droplet(&foo, 5, 5, 0.8, 0.3, -1);
 
     // foo.currentFrame[gridIndex(nx*0.5, ny*0.5, &foo)] = 10;
     // foo.lastFrame[gridIndex(nx*0.5, ny*0.5, &foo)] = 10;
@@ -319,25 +329,20 @@ int gridIndex(int x, int y, State* state) {
     return blockedIndex(bx, by, state->numBlocks, row, col);
 }
 
-
-int main_perf(void)
+#define PERF
+#ifdef PERF
+int main(void)
 {
     const int nx = 1024;
     const int ny = 1024;
-    State state = initState(nx,ny,0.2,1,0.25);
 
     long num_steps = 200;
     
     int thread_counts[] = {1,2,4,6,8};
-    double avg_times[5];
-    /*
-    Todo: get chunky
-    BOOM BOOM BOOM BOOM BOOM
-    Check larger grid sizes
-    Check for correctness- record total state for 10 iters, check for consistency with that +/- some fp epsillon
-    Plot (python)
-    */
-
+    int num_grid_sizes = 9;
+    int grid_sizes[] = {64,128,256,512,1024,1536,2048, 2560, 3200};
+    // int grid_sizes[] = {64,128,256,512,1024,64,64}; // num_grid_sizes
+    double avg_times[5][9];
     
     srand (time (NULL)); // define a seed for the random number generator
     const char ALLOWED[] = "abcdefghijklmnopqrstuvwxyz1234567890";
@@ -360,29 +365,28 @@ int main_perf(void)
     strcat(fspeedup, "-speedup.csv");
     
     FILE* timing = fopen(ftiming, "w");
-    fprintf(timing, "num_threads,avg_time_per_tick\n");
-    for(int i = 4; i >= 0; i--) {
+    fprintf(timing, "num_threads,grid_size,avg_time_per_tick,speedup\n");
+    for(int i = 0; i < 5; i++) {
         omp_set_num_threads(thread_counts[i]);
-        double starttime = omp_get_wtime();
-        for(long i = 0; i < num_steps; i++) {
-            simulate_tick(&state); // parallel
+        for(int j = 0; j < num_grid_sizes; j++) {    
+            State state = initState(grid_sizes[j],grid_sizes[j],0.2,1,0.25);
+            double starttime = omp_get_wtime();
+            for(long i = 0; i < num_steps; i++) {
+                simulate_tick(&state); // parallel
+            }
+        
+            double endtime = omp_get_wtime();
+            double elapsed = endtime - starttime;
+            double avg = elapsed / num_steps;
+            avg_times[i][j] = avg;
+            double speedup = 1.0;
+            if(i != 0) speedup = avg_times[0][j] / avg_times[i][j];
+            fprintf(timing, "%d,%d,%f,%f\n", thread_counts[i], grid_sizes[j], avg, speedup);
+            printf("%d,%d,%f,%f\n", thread_counts[i], grid_sizes[j], avg, speedup);
         }
-    
-        double endtime = omp_get_wtime();
-        double elapsed = endtime - starttime;
-        double avg = elapsed / num_steps;
-        fprintf(timing, "%d,%f\n", thread_counts[i], avg);
-        avg_times[i] = avg;
     }
     fclose(timing);
 
-    FILE* speedup = fopen(fspeedup, "w");
-    fprintf(speedup, "num_threads,speedup\n");
-    for(int i = 1; i < 5; i++) {
-        double speedu = avg_times[0] / avg_times[i];
-        fprintf(speedup, "%d,%f\n", thread_counts[i], speedu);
-    }
-    fclose(speedup);
-
     return 0;
 }
+#endif
