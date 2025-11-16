@@ -1,8 +1,7 @@
 import matplotlib.pyplot as plt
 import csv
 
-
-# for every thread count, plot grid size vs avg_time
+# for every thread count, plot grid_size vs avg_time and grid_size vs speedup
 thread_counts = {}
 with open("timing.csv") as f:
     reader = csv.reader(f, delimiter=",")
@@ -11,7 +10,7 @@ with open("timing.csv") as f:
         num_threads = int(row[0])
         
         if num_threads not in thread_counts.keys():
-            thread_counts[num_threads] = ([],[], []) # x,y1,y2 where x=grid_size and y1=avg_time, and y2=speedup
+            thread_counts[num_threads] = ([],[],[]) # x,y1,y2 where x=grid_size and y1=avg_time, and y2=speedup
         thread_counts[num_threads][0].append(int(row[1]))
         thread_counts[num_threads][1].append(float(row[2]))
         thread_counts[num_threads][2].append(float(row[3]))
